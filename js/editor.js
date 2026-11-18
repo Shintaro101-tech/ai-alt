@@ -99,10 +99,10 @@ export async function renderEditor(el, id) {
         <h2>ディスプレイのスライド</h2>
         <div class="row">
           <button class="btn btn-ghost" id="ppt">📥 PowerPoint を読み込む</button>
-          <input type="file" id="pptFile" accept=".json,application/json" hidden>
+          <input type="file" id="pptFile" accept=".json,.pptx,application/json,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
         </div>
       </div>
-      <p class="mini muted">PowerPoint は、AI-ALT の <b>tools/スライドを変換.command</b> で変換してから読み込みます（アニメーションも再現されます）。</p>
+      <p class="mini muted">PowerPoint は、先に <b>AI-ALT/tools/スライドを変換.command</b> で変換し、できた <b>○○.aialt-slides.json</b> を読み込みます（アニメーションも再現されます）。</p>
       <div id="slides">${lesson.slides.map(slideHTML).join('')}</div>
       <button class="btn btn-ghost add-slide" id="add">＋ スライドを追加（文字・画像）</button>`;
 
@@ -157,6 +157,22 @@ export async function renderEditor(el, id) {
 
   async function importDeck(file) {
     if (!file) return;
+    $('#pptFile', el).value = '';
+    if (/\.(pptx?|key)$/i.test(file.name)) {
+      openDialog(`
+        <form class="form">
+          <h2>📥 PowerPoint を変換してください</h2>
+          <p>ブラウザでは PowerPoint をそのまま再生できないため、先に変換が必要です（1回だけ）。</p>
+          <ol class="steps-list">
+            <li>Finder で <b>名桜大学公募 › AI-ALT › tools</b> を開く</li>
+            <li><b>スライドを変換.command</b> をダブルクリックし、<b>${esc(file.name)}</b> を選ぶ</li>
+            <li>同じフォルダにできた <b>${esc(file.name.replace(/\.[^.]+$/, ''))}.aialt-slides.json</b> を、もう一度「📥 PowerPoint を読み込む」で選ぶ</li>
+          </ol>
+          <p class="mini muted">初回に「開発元が未確認」と出たら、右クリック →「開く」。PowerPoint のファイルアクセスを聞かれたら「許可」。</p>
+          <div class="actions"><button class="btn btn-primary">OK</button></div>
+        </form>`);
+      return;
+    }
     let raw;
     try {
       raw = JSON.parse(await file.text());

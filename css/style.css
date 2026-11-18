@@ -239,6 +239,9 @@ dialog h2 { margin: 0 0 8px; }
 .line b { display: block; font-size: .7em; color: var(--muted); }
 .line.alt { background: var(--sun-soft); margin-left: auto; }
 
+.steps-list { padding-left: 1.3em; margin: 8px 0; }
+.steps-list li { margin-bottom: 6px; }
+
 /* editor: imported PowerPoint slides */
 .tag { font-size: .72rem; font-weight: 700; background: var(--sun-soft); color: #7A5200; padding: 2px 8px; border-radius: 99px; margin-left: 6px; }
 .deck-thumb { aspect-ratio: auto; background: #0B1626; display: grid; place-items: center; }
