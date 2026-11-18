@@ -355,16 +355,14 @@ export async function renderClass(el, id) {
     drawControls();
 
     let instructions = buildInstructions(lesson, state);
-    let cue = lesson.greet
-      ? `Greet the class now in one or two short sentences and introduce yourself by name (for example "Hi everyone! I'm ${ALTS[state.alt].name}."). Then stop and wait for the teacher.`
-      : 'Do not say anything yet. Wait silently until the teacher or a student speaks to you.';
+    let cue = "[Display update — do not respond to this message] The lesson has started. Don't say anything yet. Wait silently until the teacher speaks to you, then respond to exactly what they said.";
     if (resume) {
       const transcript = state.turns.map((t) => `${t.role === 'alt' ? 'You' : 'Class'}: ${t.text}`).join('\n').slice(-8000);
       const shown = state.board.map((c) => `${c.heading}: ${c.items.map((i) => i.text).join(' | ')}`).join('\n');
       instructions += `\n\nRESUMED LESSON
 You were away for a moment and the teacher has called you back. Don't start over or introduce yourself again. The conversation so far:
 ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
-      cue = `Say "I'm back!" or something similar in a few words, then wait for the teacher.`;
+      cue = "[Display update — do not respond to this message] You are back in the classroom. Don't say anything yet. Wait silently until the teacher speaks to you again, then continue naturally from where you left off.";
     }
 
     meter = createMeter();
@@ -585,6 +583,7 @@ HOW TO TALK
 - Speak clear, natural English, a little slower than usual, so the whole class can follow.
 - Keep your turns short (1-3 sentences), unless the teacher asks for a longer answer, a model answer or a story, or the lesson plan gives you a script.
 - The teacher leads. Follow the teacher's cues and don't start new activities by yourself. If you aren't sure what the teacher wants, ask briefly.
+- Never speak first. At the start of the lesson, wait silently until the teacher talks to you, and respond to what they actually said: if they greet you or introduce you to the class, greet everyone back and introduce yourself briefly by name; if they ask you a question, answer it.
 - Answer only when someone talks to you (they say your name, ask you a question, or the teacher turns to you). If speech is in Japanese or is clearly not addressed to you (students talking to each other, the teacher explaining in Japanese), stay silent.
 - When a student talks to you, be warm and encouraging. If they make a mistake, recast it naturally ("Oh, you mean ...?") instead of correcting directly.
 - Speak only English unless the teacher asks you to use Japanese.

@@ -93,7 +93,6 @@ export async function renderEditor(el, id) {
           <input id="level" value="${esc(lesson.level)}" placeholder="例：大学1〜2年生、CEFR A2〜B1"></label>
         <label>ALTへの指示（授業の流れ・役割・台本） <small class="muted">ALTはこの内容に沿って動きます。英語で書くとより正確です</small>
           <textarea id="plan" rows="12" placeholder="例：When the teacher asks 'Where do you live?', answer with this script: ...">${esc(lesson.plan)}</textarea></label>
-        <label class="check"><input type="checkbox" id="greet" ${lesson.greet ? 'checked' : ''}> 開始時にALTがクラスにあいさつする</label>
       </section>
       <div class="section-head">
         <h2>ディスプレイのスライド</h2>
@@ -109,7 +108,6 @@ export async function renderEditor(el, id) {
     $('#title', el).oninput = (e) => { lesson.title = e.target.value; save(); };
     $('#level', el).oninput = (e) => { lesson.level = e.target.value; save(); };
     $('#plan', el).oninput = (e) => { lesson.plan = e.target.value; save(); };
-    $('#greet', el).onchange = (e) => { lesson.greet = e.target.checked; save(); };
     $$('[data-alt]', el).forEach((b) => (b.onclick = () => {
       lesson.alt = b.dataset.alt;
       $$('[data-alt]', el).forEach((x) => x.classList.toggle('on', x === b));

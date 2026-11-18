@@ -49,7 +49,6 @@ export function blankLesson() {
     alt: 'emma',
     level: '',
     plan: '',
-    greet: true,
     slides: [blankSlide()],
   };
 }
