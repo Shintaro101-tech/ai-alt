@@ -34,3 +34,20 @@ export const LEVELS = {
 export const LEVEL_KEYS = Object.keys(LEVELS);
 export const DEFAULT_LEVEL = 'A2';
 export const levelKey = (k) => (LEVELS[k] ? k : DEFAULT_LEVEL);
+
+// Speaking speed. GPT-Live has no speed setting, so the ALT is told a target pace
+// in words per minute (WPM) for each level, made slower or faster by the teacher's choice.
+const BASE_WPM = { 'Pre-A1': 80, A1: 90, A2: 100, 'A2+': 105, B1: 120, B2: 140, C1: 160 };
+export const PACES = {
+  slower: { ja: '🐢 とてもゆっくり', factor: 0.75 },
+  slow: { ja: 'ゆっくり', factor: 0.88 },
+  normal: { ja: 'レベルどおり', factor: 1 },
+};
+export const PACE_KEYS = Object.keys(PACES);
+export const paceKey = (k) => (PACES[k] ? k : 'normal');
+
+export function paceText(cefr, pace) {
+  const wpm = Math.round((BASE_WPM[levelKey(cefr)] * PACES[paceKey(pace)].factor) / 5) * 5;
+  const slow = wpm <= 110;
+  return `SPEAKING SPEED (very important): speak at about ${wpm} words per minute${slow ? ', which is much slower than your natural speed' : ''}. ${slow ? 'Say every word clearly and fully, without linking words together. Put a short pause (about half a second) after every phrase and a longer pause after every sentence. ' : ''}Keep this speed for the whole lesson, including scripted answers and long answers, and don't speed up as the conversation goes on.`;
+}

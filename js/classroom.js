@@ -6,7 +6,7 @@
 
 import { ALTS, avatarHTML, altKey, createMeter } from './avatars.js';
 import { getLesson, saveLesson } from './store.js';
-import { LEVELS, levelKey } from './levels.js';
+import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.js';
 import { levelButtons } from './editor.js';
 import { ensurePasscode } from './api.js';
 import { LiveSession } from './live.js';
@@ -41,6 +41,7 @@ export async function renderClass(el, id) {
     pop: false, // in present mode: the newest board card shown over the slide
     jump: '', // typed slide number (then Enter), like PowerPoint
     cefr: levelKey(lesson.cefr), // students' English level
+    pace: paceKey(lesson.pace), // the ALT's speaking speed
   };
   let live = null;
   let meter = null;
@@ -68,6 +69,8 @@ export async function renderClass(el, id) {
         <div class="class-level">
           <div class="class-level-title">学生の英語レベル <small id="lvDesc"></small></div>
           <div class="level-row compact" id="cefr"></div>
+          <div class="class-level-title">話す速さ</div>
+          <div class="level-row compact" id="pace"></div>
         </div>
         <div class="ask" id="ask">
           <div class="ask-title">ALTにお願い <small>（声に出さずに伝わります）</small></div>
@@ -104,7 +107,19 @@ export async function renderClass(el, id) {
   function drawLevel() {
     $('#cefr', el).innerHTML = levelButtons(state.cefr);
     $('#lvDesc', el).textContent = `${state.cefr}：${LEVELS[state.cefr].ja}`;
+    $('#pace', el).innerHTML = PACE_KEYS.map((k) => `<button type="button" class="lv ${k === state.pace ? 'on' : ''}" data-pace="${k}"><b>${PACES[k].ja}</b></button>`).join('');
   }
+  $('#pace', el).onclick = (e) => {
+    const b = e.target.closest('[data-pace]');
+    if (!b || b.dataset.pace === state.pace) return;
+    state.pace = lesson.pace = b.dataset.pace;
+    drawLevel();
+    saveLesson(lesson).catch(() => {});
+    if (live) {
+      note(`[Teacher's private note — the class did not hear this; never read it aloud or mention it] Change your speaking speed now. ${paceText(state.cefr, state.pace)} Don't say anything about this change; just use it from your next turn.`);
+      toast(`ALTの話す速さを「${PACES[state.pace].ja.replace('🐢 ', '')}」にしました`);
+    }
+  };
   $('#cefr', el).onclick = (e) => {
     const b = e.target.closest('[data-cefr]');
     if (!b || b.dataset.cefr === state.cefr) return;
@@ -112,7 +127,7 @@ export async function renderClass(el, id) {
     drawLevel();
     saveLesson(lesson).catch(() => {});
     if (live) {
-      note(`[Teacher's private note — the class did not hear this; never read it aloud or mention it] The students' English level is now ${state.cefr}. From now on: ${LEVELS[state.cefr].guide} Don't say anything about this change; just use it from your next turn.`);
+      note(`[Teacher's private note — the class did not hear this; never read it aloud or mention it] The students' English level is now ${state.cefr}. From now on: ${LEVELS[state.cefr].guide} ${paceText(state.cefr, state.pace)} Don't say anything about this change; just use it from your next turn.`);
       toast(`ALTの話し方を ${state.cefr} に変えました`);
     }
   };
@@ -316,7 +331,7 @@ export async function renderClass(el, id) {
     slideTimer = setTimeout(() => {
       const s = cur();
       const text = slideText(s).slice(0, 700);
-      note(`[Display update — do not respond to this message] The display now shows slide ${state.slide + 1}${s.title ? ` ("${s.title}")` : ''}${stepsOf(s) > 1 ? `, after click ${state.step} of ${stepsOf(s) - 1}` : ''}.${text ? ` Text on this slide: ${text}` : ''} Stay silent now and wait for the teacher or students to speak to you.`);
+      note(`[Display update — do not respond to this message] The display now shows slide ${state.slide + 1}${s.title ? ` ("${s.title}")` : ''}${stepsOf(s) > 1 ? `, after click ${state.step} of ${stepsOf(s) - 1}` : ''}.${text ? ` Text on this slide: ${text}` : ''} Stay silent now and wait for the teacher or students to speak to you. Reminder: speak slowly, at about the speed in your instructions.`);
     }, 1500);
   }
 
@@ -631,11 +646,13 @@ function buildInstructions(lesson, state) {
   return `You are ${a.name}, an AI Assistant Language Teacher (AI-ALT) in an English class in Japan.
 You are ${a.persona}
 ${a.accent}
+${paceText(state.cefr, state.pace)}
 
 THE CLASSROOM
 You appear on a big screen at the front of the classroom, next to a display that everyone can see. A Japanese teacher of English leads the lesson and you support them, like a real ALT. Everything you hear comes from the classroom microphone: usually the teacher, sometimes a student.
 ${about ? `About the students: ${about}.
 ` : ''}THE STUDENTS' ENGLISH LEVEL (CEFR): ${LEVELS[state.cefr].guide}
+${paceText(state.cefr, state.pace)}
 Always speak at this level — your speed, words, grammar and turn length — even when the lesson plan gives you a script (keep its meaning and target grammar, but say it at this level). If the teacher tells you that the level has changed, switch at once.
 
 HOW TO TALK
