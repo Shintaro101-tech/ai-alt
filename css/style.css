@@ -128,32 +128,42 @@ dialog h2 { margin: 0 0 8px; }
 .bar-btn { font: inherit; font-weight: 700; color: #fff; background: rgba(255, 255, 255, .12); border: none; border-radius: 10px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
 .bar-btn:hover { background: rgba(255, 255, 255, .22); }
 .timer { font-variant-numeric: tabular-nums; font-weight: 700; opacity: .85; margin-right: 6px; }
-.class-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(260px, 30%) 1fr; gap: 18px; padding: 18px; }
+.class-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(200px, 19%) 1fr; gap: 14px; padding: 12px 14px; }
 
-.alt-panel { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-height: 0; }
-.alt-stage { position: relative; border-radius: 24px; overflow: hidden; box-shadow: var(--shadow); border: 5px solid #fff; transition: box-shadow .2s; flex-shrink: 1; min-height: 0; aspect-ratio: 1; max-height: 58vh; align-self: center; width: 100%; max-width: 58vh; }
+.alt-panel { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; overflow-y: auto; }
+.alt-stage { position: relative; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); border: 4px solid #fff; transition: box-shadow .2s; flex-shrink: 0; aspect-ratio: 1; align-self: center; width: 100%; max-width: 32vh; }
 .alt-stage .av { width: 100%; height: 100%; }
 .alt-stage.speaking { box-shadow: 0 0 0 5px var(--sun), var(--shadow); }
-.alt-name { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.alt-name b { font-size: 1.6rem; }
+.alt-name { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.alt-name b { font-size: 1.3rem; }
 .alt-name > span:not(.pill) { color: var(--muted); font-weight: 700; }
 .pill { font-size: .8rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
 .pill.on { background: #DDF5E8; color: var(--ok); }
 .pill.wait { background: var(--sun-soft); color: #8A5A00; }
 .pill.mute { background: #FDE4DC; color: var(--ng); }
 .alt-controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.alt-controls .big { font-size: 1.15rem; padding: 12px 26px; }
-.mic { background: var(--ok); color: #fff; font-size: 1.05rem; padding: 11px 22px; }
+.alt-controls .big { font-size: 1.05rem; padding: 10px 20px; }
+.mic { background: var(--ok); color: #fff; padding: 9px 16px; }
 .mic.off { background: var(--ng); }
-.alt-pick { display: flex; gap: 8px; justify-content: center; }
+.alt-pick { display: flex; gap: 6px; justify-content: center; }
 .pick { padding: 0; border: 3px solid transparent; border-radius: 50%; background: none; cursor: pointer; opacity: .7; }
-.pick .av { width: 46px; border-radius: 50%; }
+.pick .av { width: 38px; border-radius: 50%; }
 .pick.on { border-color: var(--navy); opacity: 1; }
 .pick:hover { opacity: 1; }
-.whisper { display: flex; gap: 6px; margin-top: auto; }
-.whisper input { font-size: .85rem; padding: 7px 10px; }
+.ask { margin-top: auto; background: var(--surface); border-radius: 14px; padding: 10px; box-shadow: var(--shadow); display: grid; gap: 8px; }
+.ask.off { opacity: .55; }
+.ask-title { font-weight: 800; font-size: .85rem; color: var(--navy); }
+.ask-title small { font-weight: 500; color: var(--muted); }
+.ask-hint { margin: 0; font-size: .72rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font: inherit; font-size: .76rem; font-weight: 700; padding: 5px 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.chip:hover { background: var(--sun-soft); border-color: var(--sun); }
+.whisper { display: flex; gap: 6px; }
+.whisper input { font-size: .82rem; padding: 6px 9px; }
 
 .display { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.display-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.display-head .btn { margin-bottom: 4px; }
 .display-tabs { display: flex; gap: 6px; padding-left: 14px; }
 .dtab { position: relative; font: inherit; font-weight: 700; font-size: .9rem; padding: 8px 16px; border: none; border-radius: 12px 12px 0 0; background: rgba(18, 58, 107, .12); color: var(--navy); cursor: pointer; }
 .dtab.on { background: var(--navy); color: #fff; }
@@ -171,6 +181,25 @@ dialog h2 { margin: 0 0 8px; }
 .dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .dot { font: inherit; font-weight: 700; font-size: .8rem; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; }
 .dot.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.steps { font-size: .78rem; font-weight: 700; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.screen[data-tab="slides"] { cursor: pointer; }
+.screen.dark { background: #0B1626; }
+
+/* PowerPoint slides: picture per click step + animated cut-outs */
+.stage-wrap { position: absolute; inset: 0; display: grid; place-items: center; }
+.stage { position: relative; width: min(100cqw, calc(100cqh * var(--ar))); aspect-ratio: var(--ar); overflow: hidden; background: #fff; }
+.stage-base { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.stage-fx { position: absolute; pointer-events: none; will-change: transform, opacity, clip-path; }
+.stage-fx canvas { display: block; width: 100%; height: 100%; }
+.stage-fx.full { inset: 0; width: 100%; height: 100%; }
+
+/* black / white screen (B / W), the board pop-up over a slide */
+.blank { position: absolute; inset: 0; }
+.blank.black { background: #000; }
+.blank.white { background: #fff; }
+.board-pop { position: absolute; right: 2.5cqw; bottom: 2.5cqw; width: min(62cqw, 900px); max-height: 80cqh; overflow: auto; filter: drop-shadow(0 10px 30px rgba(0, 0, 0, .35)); animation: pop .35s ease-out; }
+.board-pop .card-b { font-size: 3cqw; background: #FFFBEA; }
+
 .screen-empty { height: 100%; display: grid; place-content: center; text-align: center; color: var(--muted); padding: 20px; font-size: clamp(14px, 2.4cqw, 22px); }
 .screen-empty p { margin: 4px 0; }
 
@@ -209,6 +238,35 @@ dialog h2 { margin: 0 0 8px; }
 .line { margin: 0 0 .9em; max-width: 86%; padding: .5em .8em; border-radius: 14px; background: var(--surface-2); }
 .line b { display: block; font-size: .7em; color: var(--muted); }
 .line.alt { background: var(--sun-soft); margin-left: auto; }
+
+/* editor: imported PowerPoint slides */
+.tag { font-size: .72rem; font-weight: 700; background: var(--sun-soft); color: #7A5200; padding: 2px 8px; border-radius: 99px; margin-left: 6px; }
+.deck-thumb { aspect-ratio: auto; background: #0B1626; display: grid; place-items: center; }
+.deck-thumb img { display: block; width: 100%; }
+.slide-edit details { margin-top: 10px; }
+.slide-edit pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
+
+/* slides only, full screen (F5 / Esc) */
+.present-ui { display: none; }
+.classroom.present { background: #000; }
+.classroom.present .class-bar,
+.classroom.present .display-head,
+.classroom.present .display-nav { display: none; }
+.classroom.present .class-main { display: block; padding: 0; }
+.classroom.present .alt-panel { display: none; }
+.classroom.present .display { height: 100%; }
+.classroom.present .screen { border: none; border-radius: 0; box-shadow: none; background: #000; height: 100%; }
+.classroom.present .screen[data-tab="slides"]:not(.dark) { background: #fff; }
+.classroom.present .present-ui { display: block; }
+.present-status { position: fixed; left: 14px; bottom: 12px; display: flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 700; color: rgba(255, 255, 255, .55); pointer-events: none; mix-blend-mode: difference; }
+.dot-live { width: 9px; height: 9px; border-radius: 50%; background: #3BD67F; }
+.dot-live.off { background: #FF6B4A; }
+.present-ask { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(720px, 90vw); }
+.present-ask input { font-size: 1.05rem; padding: 12px 16px; border-radius: 14px; border: 2px solid var(--sun); box-shadow: 0 10px 30px rgba(0, 0, 0, .4); }
+/* A: a small ALT in the corner while presenting */
+.classroom.present.show-alt .alt-panel { display: block; position: fixed; right: 16px; bottom: 16px; width: 150px; z-index: 5; overflow: visible; }
+.classroom.present.show-alt .alt-panel > :not(.alt-stage) { display: none; }
+.classroom.present.show-alt .alt-stage { max-width: none; }
 
 @media (max-width: 860px) {
   .classroom { height: auto; min-height: 100vh; overflow: visible; }

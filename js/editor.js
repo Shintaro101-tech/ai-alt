@@ -1,9 +1,10 @@
 // Lesson editor: the ALT, the lesson plan the ALT follows, and the slides on the display.
-// Changes are saved automatically.
+// Slides are either made here (text and a picture) or imported from PowerPoint
+// (converted with tools/スライドを変換.command). Changes are saved automatically.
 
 import { ALTS, avatarHTML, altKey } from './avatars.js';
 import { getLesson, saveLesson, blankSlide } from './store.js';
-import { $, $$, esc, toast, richText, readImage, confirmDialog } from './util.js';
+import { $, $$, esc, toast, richText, readImage, confirmDialog, openDialog, uid } from './util.js';
 
 export async function renderEditor(el, id) {
   const lesson = await getLesson(id);
@@ -22,18 +23,38 @@ export async function renderEditor(el, id) {
         $('#saved', el).textContent = '保存できませんでした';
         toast(`保存できませんでした: ${err.message}`, 'error');
       }
-    }, 500);
+    }, 700);
   };
 
-  const slideHTML = (s, i) => `
+  const tools = (i) => `
+    <div class="row">
+      <button class="btn btn-ghost btn-sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="上へ">↑</button>
+      <button class="btn btn-ghost btn-sm" data-move="1" ${i === lesson.slides.length - 1 ? 'disabled' : ''} title="下へ">↓</button>
+      <button class="btn btn-ghost btn-sm" data-remove title="削除">🗑</button>
+    </div>`;
+
+  const deckHTML = (s, i) => `
+    <article class="slide-edit deck" data-i="${i}">
+      <div class="slide-edit-head">
+        <b>スライド ${i + 1} <span class="tag">PowerPoint${s.deck.steps.length > 1 ? ` ・ クリック ${s.deck.steps.length - 1} 回` : ''}</span></b>
+        ${tools(i)}
+      </div>
+      <div class="slide-edit-grid">
+        <div class="fields">
+          <label>見出し（一覧・ALT用）<input data-f="title" value="${esc(s.title)}"></label>
+          <label>ALTへのメモ <small class="muted">PowerPoint のノートが入ります。生徒には見えません</small>
+            <textarea data-f="note" rows="3">${esc(s.note)}</textarea></label>
+          ${s.deck.text ? `<details class="mini muted"><summary>ALTが読み取ったスライドの文字</summary><pre>${esc(s.deck.text)}</pre></details>` : ''}
+        </div>
+        <div class="mini-screen deck-thumb"><img src="${s.deck.steps[s.deck.steps.length - 1]}" alt=""></div>
+      </div>
+    </article>`;
+
+  const slideHTML = (s, i) => s.deck ? deckHTML(s, i) : `
     <article class="slide-edit" data-i="${i}">
       <div class="slide-edit-head">
         <b>スライド ${i + 1}</b>
-        <div class="row">
-          <button class="btn btn-ghost btn-sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="上へ">↑</button>
-          <button class="btn btn-ghost btn-sm" data-move="1" ${i === lesson.slides.length - 1 ? 'disabled' : ''} title="下へ">↓</button>
-          <button class="btn btn-ghost btn-sm" data-remove title="削除">🗑</button>
-        </div>
+        ${tools(i)}
       </div>
       <div class="slide-edit-grid">
         <div class="fields">
@@ -74,9 +95,16 @@ export async function renderEditor(el, id) {
           <textarea id="plan" rows="12" placeholder="例：When the teacher asks 'Where do you live?', answer with this script: ...">${esc(lesson.plan)}</textarea></label>
         <label class="check"><input type="checkbox" id="greet" ${lesson.greet ? 'checked' : ''}> 開始時にALTがクラスにあいさつする</label>
       </section>
-      <h2>ディスプレイのスライド</h2>
+      <div class="section-head">
+        <h2>ディスプレイのスライド</h2>
+        <div class="row">
+          <button class="btn btn-ghost" id="ppt">📥 PowerPoint を読み込む</button>
+          <input type="file" id="pptFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <p class="mini muted">PowerPoint は、AI-ALT の <b>tools/スライドを変換.command</b> で変換してから読み込みます（アニメーションも再現されます）。</p>
       <div id="slides">${lesson.slides.map(slideHTML).join('')}</div>
-      <button class="btn btn-ghost add-slide" id="add">＋ スライドを追加</button>`;
+      <button class="btn btn-ghost add-slide" id="add">＋ スライドを追加（文字・画像）</button>`;
 
     $('#title', el).oninput = (e) => { lesson.title = e.target.value; save(); };
     $('#level', el).oninput = (e) => { lesson.level = e.target.value; save(); };
@@ -93,11 +121,13 @@ export async function renderEditor(el, id) {
       draw();
       $$('.slide-edit', el).pop()?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
+    $('#ppt', el).onclick = () => $('#pptFile', el).click();
+    $('#pptFile', el).onchange = (e) => importDeck(e.target.files[0]);
 
     $$('.slide-edit', el).forEach((card) => {
       const i = +card.dataset.i;
       const s = lesson.slides[i];
-      const preview = () => { $('.mini-screen', card).innerHTML = slideView(s); };
+      const preview = () => { if (!s.deck) $('.mini-screen', card).innerHTML = slideView(s); };
       $$('[data-f]', card).forEach((f) => (f.oninput = () => { s[f.dataset.f] = f.value; save(); preview(); }));
       $$('[data-move]', card).forEach((b) => (b.onclick = () => {
         const j = i + +b.dataset.move;
@@ -112,7 +142,7 @@ export async function renderEditor(el, id) {
         save();
         draw();
       };
-      $('[data-img]', card).onchange = async (e) => {
+      $('[data-img]', card)?.addEventListener('change', async (e) => {
         const f = e.target.files[0];
         if (!f) return;
         try {
@@ -120,16 +150,65 @@ export async function renderEditor(el, id) {
           save();
           draw();
         } catch (err) { toast(err.message, 'error'); }
-      };
+      });
       $('[data-noimg]', card)?.addEventListener('click', () => { s.image = ''; save(); draw(); });
     });
   };
+
+  async function importDeck(file) {
+    if (!file) return;
+    let raw;
+    try {
+      raw = JSON.parse(await file.text());
+    } catch {
+      toast('ファイルを読み込めませんでした', 'error');
+      return;
+    }
+    if (raw?.kind !== 'slides' || !Array.isArray(raw.slides)) {
+      toast('変換したスライドのファイル（.aialt-slides.json）を選んでください', 'error');
+      return;
+    }
+    const slides = raw.slides.map((s) => ({
+      id: uid(),
+      title: s.title || `Slide ${s.number}`,
+      body: '',
+      image: '',
+      note: s.notes || '',
+      deck: { steps: s.steps, clicks: s.clicks || [], transition: Boolean(s.transition), text: s.text || '', aspect: raw.aspect || 16 / 9 },
+    }));
+    const blank = lesson.slides.every((s) => !s.deck && !s.title && !s.body && !s.image);
+    let mode = 'replace';
+    if (!blank) {
+      mode = await new Promise((resolve) => {
+        let pick = null;
+        const dlg = openDialog(`
+          <form class="form">
+            <h2>📥 ${esc(raw.name || 'PowerPoint')}（${slides.length}枚）</h2>
+            <p>今あるスライドをどうしますか？</p>
+            <div class="actions">
+              <button type="button" class="btn btn-ghost" data-close>キャンセル</button>
+              <button type="button" class="btn btn-ghost" data-pick="append">後ろに追加</button>
+              <button type="button" class="btn btn-primary" data-pick="replace">置き換える</button>
+            </div>
+          </form>`);
+        $$('[data-pick]', dlg).forEach((b) => (b.onclick = () => { pick = b.dataset.pick; dlg.close(); }));
+        dlg.addEventListener('close', () => resolve(pick), { once: true });
+      });
+      if (!mode) return;
+    }
+    lesson.slides = mode === 'append' ? [...lesson.slides, ...slides] : slides;
+    save();
+    draw();
+    toast(`${slides.length}枚のスライドを読み込みました`, 'success');
+  }
+
   draw();
   return () => clearTimeout(timer);
 }
 
-// One slide as it appears on the display (also used by the classroom).
+// One made-here slide as it appears on the display (also used by the classroom).
 export function slideView(s) {
+  if (s.deck) return `<div class="slide image-only"><figure><img src="${s.deck.steps[s.deck.steps.length - 1]}" alt=""></figure></div>`;
   const hasText = Boolean((s.title || '').trim() || (s.body || '').trim());
   const cls = s.image ? (hasText ? 'has-image' : 'image-only') : '';
   return `

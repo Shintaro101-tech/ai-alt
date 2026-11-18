@@ -6,14 +6,47 @@
 ## 画面
 
 - **左：ALT** … 「▶ ○○ を呼ぶ」で会話開始。話すと口が動きます。
-  - 🎙 マイクON/OFF（スペースキー）… 日本語で説明するときなどはOFFに
-  - ALTへの指示 … 入力した内容は、声に出さずにALTだけに伝わります（例：Now answer the second question.）
+  - 🎙 マイクON/OFF（M キー）… 日本語で説明するときなどはOFFに
+  - **ALTにお願い** … ボタン（このスライドを説明／例文をボードに／クラスに質問／もう一度ゆっくり）か、入力欄から。声に出さずにALTだけに伝わります
+  - 声で聞くときは「Emma, …」と名前を呼ぶ
   - ⏹ 終了 → 「▶ 再開する」で、それまでの会話を覚えたまま戻ってきます
 - **右：ディスプレイ**
-  - 📑 スライド … 教員が準備したスライド（文字・画像）。←/→ キーで移動。ALTは今のスライドを把握しています
+  - 📑 スライド … PowerPoint（アニメーションつき）や、ここで作ったスライド。ALTは今のスライドの文字とメモを把握しています
   - ✍️ ALTボード … ALTが会話の中で重要表現・例文・質問を書き出します（「Can you write it on the board?」でも可）
   - 💬 スクリプト … 会話がリアルタイムで文字に
-- F キーで全画面
+  - **🖥 スライドだけ全画面**（F5）… ALTを隠してスライドだけを表示。Esc で戻る
+
+## スライドの操作（PowerPoint と同じ）
+
+| 操作 | キー |
+|---|---|
+| 次へ（アニメーション・次のスライド） | クリック、→、↓、Space、Enter、PageDown、N |
+| 前へ | ←、↑、PageUp、Backspace、P |
+| 最初から全画面／今のスライドから全画面 | F5／Shift+F5 |
+| 全画面をやめる | Esc |
+| 番号のスライドへ | 数字 → Enter |
+| 最初／最後 | Home／End |
+| 黒い画面／白い画面 | B（.）／W（,） |
+| ALTにお願い（入力欄を開く） | Q または / |
+| マイクON/OFF | M |
+| 全画面中にALTを小さく表示 | A |
+
+プレゼン用リモコンは PageUp/PageDown・F5・Esc・B を送るので、そのまま使えます。
+全画面中にALTがボードに書いたときは、スライドの上に表示されます（次のクリックで閉じます）。
+
+## PowerPoint を読み込む
+
+1. `tools/スライドを変換.command` をダブルクリックし、PowerPoint ファイル（.pptx）を選ぶ
+   - 初回は「開発元が未確認」と出たら、右クリック →「開く」
+   - PowerPoint が自動で開いて閉じます（「ファイルへのアクセス」を聞かれたら許可）
+2. 同じフォルダに `○○.aialt-slides.json` ができる
+3. AI-ALT のレッスン編集 →「📥 PowerPoint を読み込む」でそのファイルを選ぶ
+
+- クリックごとの状態を PowerPoint 自身が描くので、見た目は元のスライドと同じです
+- アニメーションは「フェード・スライドイン・ワイプ・ズーム・浮き上がり・アピア」を再現（その他はフェード）。画面切り替えはクロスフェード
+- PowerPoint の**ノート**は「ALTへのメモ」になります（生徒には見えません）
+- スライドを直したら、もう一度変換して読み込み直してください
+- 必要なもの：Mac・Microsoft PowerPoint・python-pptx（初回に自動インストール）・poppler（`brew install poppler`）
 
 ## レッスンの作り方
 
@@ -46,7 +79,8 @@ index.html
 css/style.css
 js/app.js        ルーター
 js/home.js       レッスン一覧
-js/editor.js     レッスン編集・スライドの表示
+js/editor.js     レッスン編集・スライドの表示・PowerPoint の読み込み
+js/deck.js       PowerPoint スライドの表示とアニメーション再生
 js/classroom.js  授業画面（ALT・ディスプレイ・ALTへの指示文）
 js/live.js       GPT-Live の接続（洋書トークと共通）
 js/api.js        中継サーバー・合言葉
@@ -55,4 +89,5 @@ js/store.js      レッスンの保存（IndexedDB）
 js/sample.js     サンプルレッスン
 assets/avatars/  アバター画像（洋書トークからコピー）
 assets/lessons/  サンプルレッスンの画像
+tools/           PowerPoint → AI-ALT 変換（スライドを変換.command / pptx2aialt.py）
 ```
