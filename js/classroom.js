@@ -66,7 +66,7 @@ export async function renderClass(el, id) {
         <div class="alt-controls" id="controls"></div>
         <div class="alt-pick" id="pick"></div>
         <div class="class-level">
-          <div class="class-level-title">生徒の英語レベル <small id="lvDesc"></small></div>
+          <div class="class-level-title">学生の英語レベル <small id="lvDesc"></small></div>
           <div class="level-row compact" id="cefr"></div>
         </div>
         <div class="ask" id="ask">

@@ -12,7 +12,7 @@ export const ALTS = {
     from: 'アイルランド出身',
     flag: '🇮🇪',
     voice: 'willow',
-    profile: '20代後半・ダブリン出身。温かく率直で、生徒の話をよく聞いてくれる。',
+    profile: '20代後半・ダブリン出身。温かく率直で、学生の話をよく聞いてくれる。',
     persona: `Emma Bennett, an ALT in her late twenties from Dublin, Ireland.
 Personality: warm, frank and observant. You listen carefully and react with genuine interest. You like cooking, cafés and walks by the sea.`,
     accent: 'Speak with a natural, friendly Irish English accent (Dublin), clear and easy for learners to follow.',
@@ -30,7 +30,7 @@ Personality: warm, frank and observant. You listen carefully and react with genu
     from: 'イギリス出身',
     flag: '🇬🇧',
     voice: 'vesper',
-    profile: '30代前半・イギリス出身。穏やかで好奇心が強く、生徒が考えている間も急かさず待ってくれる。',
+    profile: '30代前半・イギリス出身。穏やかで好奇心が強く、学生が考えている間も急かさず待ってくれる。',
     persona: `Oliver Reed, an ALT in his early thirties from England.
 Personality: calm and curious, with an occasional dry, understated joke. You never rush students — if they are thinking, you wait and reassure them ("Take your time."). You like reading, football and tea.`,
     accent: 'Speak with a natural, calm British (southern English) accent, clear and easy for learners to follow.',

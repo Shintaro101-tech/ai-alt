@@ -43,7 +43,7 @@ export async function renderEditor(el, id) {
       <div class="slide-edit-grid">
         <div class="fields">
           <label>見出し（一覧・ALT用）<input data-f="title" value="${esc(s.title)}"></label>
-          <label>ALTへのメモ <small class="muted">PowerPoint のノートが入ります。生徒には見えません</small>
+          <label>ALTへのメモ <small class="muted">PowerPoint のノートが入ります。学生には見えません</small>
             <textarea data-f="note" rows="3">${esc(s.note)}</textarea></label>
           ${s.deck.text ? `<details class="mini muted"><summary>ALTが読み取ったスライドの文字</summary><pre>${esc(s.deck.text)}</pre></details>` : ''}
         </div>
@@ -68,7 +68,7 @@ export async function renderEditor(el, id) {
             <label class="btn btn-ghost btn-sm">🖼 ${s.image ? '画像を変更' : '画像を追加'}<input type="file" accept="image/*" data-img hidden></label>
             ${s.image ? '<button class="btn btn-ghost btn-sm" data-noimg>画像を外す</button>' : ''}
           </div>
-          <label>ALTへのメモ <small class="muted">生徒には見えません（この場面でALTにしてほしいこと・答えなど）</small>
+          <label>ALTへのメモ <small class="muted">学生には見えません（この場面でALTにしてほしいこと・答えなど）</small>
             <textarea data-f="note" rows="2">${esc(s.note)}</textarea></label>
         </div>
         <div class="mini-screen">${slideView(s)}</div>
@@ -90,9 +90,9 @@ export async function renderEditor(el, id) {
             <button type="button" class="alt-opt ${altKey(lesson.alt) === k ? 'on' : ''}" data-alt="${k}">
               ${avatarHTML(k, { framing: 'face' })}<span>${a.name} ${a.flag}</span></button>`).join('')}
         </div>
-        <div class="field-label">生徒の英語レベル（CEFR） <small class="muted">ALTが話すスピード・単語・文の長さを合わせます。授業画面でも変えられます</small></div>
+        <div class="field-label">学生の英語レベル（CEFR） <small class="muted">ALTが話すスピード・単語・文の長さを合わせます。授業画面でも変えられます</small></div>
         <div class="level-row" id="cefr">${levelButtons(lesson.cefr)}</div>
-        <label>生徒について（任意） <small class="muted">学年・人数・興味など</small>
+        <label>学生について（任意） <small class="muted">学年・人数・興味など</small>
           <input id="level" value="${esc(lesson.level)}" placeholder="例：大学1〜2年生、英語が苦手な学生が多い"></label>
         <label>ALTへの指示（授業の流れ・役割・台本） <small class="muted">ALTはこの内容に沿って動きます。英語で書くとより正確です</small>
           <textarea id="plan" rows="12" placeholder="例：When the teacher asks 'Where do you live?', answer with this script: ...">${esc(lesson.plan)}</textarea></label>
