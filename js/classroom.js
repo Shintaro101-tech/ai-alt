@@ -82,7 +82,7 @@ export async function renderClass(el, id) {
       <section class="display">
         <div class="display-head">
           <div class="display-tabs" id="tabs"></div>
-          <button class="btn btn-ghost btn-sm" id="present" title="スライドだけを全画面に（F5）">🖥 スライドだけ全画面</button>
+          <button class="btn btn-ghost btn-sm" id="present" title="スライドだけを全画面に（F5）">🖥 <span class="lbl-long">スライドだけ</span>全画面</button>
         </div>
         <div class="screen" id="screen"></div>
         <div class="display-nav" id="nav"></div>
@@ -90,6 +90,11 @@ export async function renderClass(el, id) {
     </main>
     <div class="present-ui">
       <div class="present-status" id="pstatus"></div>
+      <div class="present-tools">
+        <button type="button" id="pAlt" title="ALTを小さく表示（A）">🙂</button>
+        <button type="button" id="pAsk" title="ALTにお願い（Q）">💬</button>
+        <button type="button" id="pExit" title="全画面をやめる（Esc）">✕</button>
+      </div>
       <form class="present-ask hide" id="pask" autocomplete="off">
         <input name="w" placeholder="ALTへのお願い（Enterで送る・Escで閉じる）">
       </form>
@@ -191,7 +196,7 @@ export async function renderClass(el, id) {
         preload(s);
         preload(lesson.slides[state.slide + 1]);
       } else {
-        screen.innerHTML = slideView(s);
+        screen.innerHTML = `<div class="slide-frame"><div class="slide-box">${slideView(s)}</div></div>`;
       }
       if (state.pop && state.board[0]) screen.insertAdjacentHTML('beforeend', `<div class="board-pop">${cardHTML(state.board[0], true)}</div>`);
       if (state.blank) screen.insertAdjacentHTML('beforeend', `<div class="blank ${state.blank}"></div>`);
@@ -517,6 +522,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     drawDisplay();
   }
   $('#present', el).onclick = () => setPresent(true);
+  if (!document.fullscreenEnabled) $('#full', el).classList.add('hide');
   $('#full', el).onclick = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen?.().catch(() => {});
@@ -524,9 +530,33 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
   const onFull = () => { if (!document.fullscreenElement && state.present) setPresent(false); };
   document.addEventListener('fullscreenchange', onFull);
 
-  // Clicking the slide moves on, like PowerPoint.
-  $('#screen', el).addEventListener('click', (e) => {
-    if (state.tab !== 'slides' || e.target.closest('button, a, input')) return;
+  // Buttons for touch screens while presenting (no keyboard).
+  $('#pExit', el).onclick = () => setPresent(false);
+  $('#pAsk', el).onclick = () => openPresentAsk();
+  $('#pAlt', el).onclick = () => el.classList.toggle('show-alt');
+
+  // Clicking (tapping) the slide moves on, like PowerPoint; swiping goes forward or back.
+  let swipe = null;
+  let swiped = false;
+  const screenEl = $('#screen', el);
+  screenEl.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    swipe = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+  }, { passive: true });
+  screenEl.addEventListener('touchend', (e) => {
+    if (!swipe || state.tab !== 'slides') return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipe.x;
+    const dy = t.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      swiped = true;
+      setTimeout(() => { swiped = false; }, 400);
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+  screenEl.addEventListener('click', (e) => {
+    if (swiped || state.tab !== 'slides' || e.target.closest('button, a, input')) return;
     next();
   });
 

@@ -271,12 +271,92 @@ dialog h2 { margin: 0 0 8px; }
 .classroom.present.show-alt .alt-panel > :not(.alt-stage) { display: none; }
 .classroom.present.show-alt .alt-stage { max-width: none; }
 
-@media (max-width: 860px) {
-  .classroom { height: auto; min-height: 100vh; overflow: visible; }
-  .class-main { grid-template-columns: 1fr; }
-  .alt-stage { max-width: 320px; }
-  .screen { aspect-ratio: 16 / 10; flex: none; }
+/* buttons shown on touch screens while presenting */
+.present-tools { position: fixed; top: 10px; right: 10px; display: none; gap: 8px; z-index: 6; }
+.present-tools button { font: inherit; font-size: 1.1rem; width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(0, 0, 0, .45); color: #fff; cursor: pointer; }
+@media (hover: none) { .classroom.present .present-tools { display: flex; } }
+
+/* ------------------------------------------------------------ tablets & phones */
+@media (max-width: 1100px) {
+  .class-main { grid-template-columns: minmax(180px, 23%) 1fr; gap: 10px; padding: 10px; }
+  .alt-stage { max-width: 24vh; }
+  .chip { font-size: .72rem; padding: 4px 8px; }
 }
+
+/* narrow screens: the display on top, the ALT below it */
+@media (max-width: 860px) {
+  .classroom { height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+  .classroom.present { height: 100vh; height: 100dvh; overflow: hidden; }
+  .class-bar { position: sticky; top: 0; z-index: 4; padding: 6px 10px; }
+  .class-title { font-size: .95rem; }
+  .bar-btn { padding: 6px 10px; font-size: .85rem; }
+  .class-main { display: flex; flex-direction: column; gap: 12px; padding: 10px; }
+  .display { order: -1; }
+  .screen { aspect-ratio: 16 / 10; flex: none; border-width: 6px; border-radius: 14px; }
+  .display-head { align-items: center; }
+  .display-tabs { padding-left: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+  .display-head .btn { margin-bottom: 0; }
+  .dtab { white-space: nowrap; flex-shrink: 0; }
+  .display-nav { flex-wrap: wrap; gap: 8px; }
+
+  /* ALT: avatar on the left, name and buttons on the right */
+  .alt-panel { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 8px 14px; overflow: visible; }
+  .alt-stage { grid-row: span 3; max-width: none; border-radius: 16px; }
+  .alt-name, .alt-controls, .alt-pick { justify-content: flex-start; }
+  .class-level, .ask { grid-column: 1 / -1; }
+  .class-level-title { text-align: left; }
+  .level-row.compact { justify-content: flex-start; }
+  .ask { margin-top: 0; }
+}
+
+@media (max-width: 560px) {
+  .page { padding: 14px 12px 48px; }
+  .brand b { font-size: 1.25rem; }
+  .alts { grid-template-columns: 1fr; }
+  .lesson { padding: 12px; gap: 10px; }
+  .lesson-info { min-width: 0; flex-basis: calc(100% - 70px); }
+  .lesson-actions { width: 100%; }
+  .lesson-actions .btn-primary { flex: 1; }
+  .card { padding: 14px; }
+  .slide-edit { padding: 12px; }
+  .alt-pick-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .alt-opt { padding: 6px 2px; font-size: .78rem; }
+  .alt-opt .av { width: 48px; }
+  .level-row:not(.compact) { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .lv { min-width: 0; padding: 6px 4px; }
+  .lv small { font-size: .62rem; }
+
+  .timer { display: none; }
+  .class-title .logo { display: none; }
+  .lbl-long { display: none; }
+  .dtab { padding: 7px 11px; font-size: .82rem; }
+  .alt-panel { grid-template-columns: 96px 1fr; }
+  .alt-name b { font-size: 1.1rem; }
+  .alt-controls .big { font-size: .95rem; padding: 8px 14px; }
+  .pick .av { width: 32px; }
+  .whisper input { font-size: 16px; } /* no auto-zoom on iPhone */
+  .dot { width: 28px; height: 28px; }
+  .script { font-size: 15px; }
+  .card-b { font-size: 15px; }
+  .card-b h3 { font-size: 12px; }
+  .card-b.latest { font-size: 17px; }
+  .card-b.latest h3 { font-size: 13px; }
+}
+
+/* phones held sideways: keep the two columns, small ALT */
+@media (max-width: 960px) and (max-height: 500px) and (orientation: landscape) {
+  .classroom { height: 100vh; height: 100dvh; overflow: hidden; }
+  .class-main { display: grid; grid-template-columns: 170px 1fr; padding: 6px 8px; gap: 8px; }
+  .display { order: 0; }
+  .screen { aspect-ratio: auto; flex: 1; }
+  .alt-panel { display: flex; overflow-y: auto; }
+  .alt-stage { max-width: 110px; }
+  .class-bar { position: static; padding: 4px 10px; }
+  .display-nav { min-height: 38px; padding-top: 6px; }
+}
+
+/* iPhone: inputs under 16px make Safari zoom in */
+@media (hover: none) { input, textarea { font-size: 16px; } }
 
 /* Students' English level (CEFR) */
 .level-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -293,3 +373,7 @@ dialog h2 { margin: 0 0 8px; }
 .level-row.compact .lv b { font-size: .75rem; }
 .level-row.compact .lv small { display: none; }
 .classroom.present .class-level { display: none; }
+
+/* slides made in AI-ALT keep a 16:10 shape on any screen (phones, tablets, projectors) */
+.slide-frame { position: absolute; inset: 0; display: grid; place-items: center; }
+.slide-box { container-type: size; width: min(100cqw, 160cqh); aspect-ratio: 16 / 10; }
