@@ -5,7 +5,7 @@ export const SAMPLE_LESSON = {
   alt: 'emma',
   level: 'Japanese university students, CEFR A2–B1',
   greet: true,
-  plan: `This is a 25-minute grammar lesson on the second conditional (If + past simple, would + verb), taught with a communicative approach:
+  plan: `This is a 25-minute grammar lesson on the second conditional (If + past simple, would / could + verb), taught with a communicative approach:
 Pre-text task → Listening → Clarification → Controlled practice → Freer practice.
 
 In this lesson you live in a small apartment in Naha, Okinawa, near Kokusai Street.
@@ -20,7 +20,7 @@ Teacher: What do you like about your home and neighborhood?
 You: There are two things I really like. First, it's really convenient. The bus stop is right in front of my building, so I can go almost anywhere easily. Second, my neighbors are really friendly. The old lady next door often gives me fruit from her garden. Honestly, if I moved away, I would really miss her.
 
 Teacher: What do you dislike about your home and neighborhood?
-You: Well, there are two things I don't like. First, my apartment is really small, especially the kitchen. If I had a bigger kitchen, I would invite my friends over for dinner more often. Second, it's very noisy at night because there are so many tourists. If it were quieter, I'd sleep much better. So my neighborhood isn't perfect, but I'm happy living there for now.
+You: Well, there are two things I don't like. First, my apartment is really small, especially the kitchen. If I had a bigger kitchen, I could invite my friends over for dinner more often. Second, it's very noisy at night because there are so many tourists. If it were quieter, I'd sleep much better. So my neighborhood isn't perfect, but I'm happy living there for now.
 
 If the teacher asks you to say it again, repeat the same answer the same way.
 
@@ -43,13 +43,13 @@ OTHER STAGES
     },
     {
       title: 'Listen again',
-      body: 'Fill in the blanks.\n1. If I moved away, I ______ really miss her.\n2. If I ______ a bigger kitchen, I would invite my friends over.\n3. If it ______ quieter, I\'d sleep much better.',
+      body: 'Fill in the blanks.\n1. If I moved away, I ______ really miss her.\n2. If I had a bigger kitchen, I ______ invite my friends over.\n3. If it ______ quieter, I\'d sleep much better.',
       image: '',
-      note: 'Listening (detail). Answers: 1 would, 2 had, 3 were. If the teacher asks, repeat your answers from the interview.',
+      note: 'Listening (detail). Answers: 1 would, 2 could, 3 were. If the teacher asks, repeat your answers from the interview.',
     },
     {
       title: 'Second Conditional',
-      body: '**If + past simple, would + verb**\nIf I **had** a bigger kitchen, I **would invite** my friends.\n- Real now: My kitchen is small.\n- Imagined: a bigger kitchen\n\nI would → **I\'d**\nIf it **were** quieter, I\'d sleep better.',
+      body: '**If + past simple, would / could + verb**\nIf I **had** a bigger kitchen, I **could invite** my friends.\n- could = would be able to\n- Real now: My kitchen is small.\n- Imagined: a bigger kitchen\n\nI would → **I\'d**\nIf it **were** quieter, I\'d sleep better.',
       image: '',
       note: 'Clarification. The teacher leads with concept-checking questions. Model the sentences when asked.',
     },
