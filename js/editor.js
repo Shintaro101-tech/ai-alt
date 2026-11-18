@@ -3,6 +3,7 @@
 // (converted with tools/スライドを変換.command). Changes are saved automatically.
 
 import { ALTS, avatarHTML, altKey } from './avatars.js';
+import { LEVELS, LEVEL_KEYS, levelKey } from './levels.js';
 import { getLesson, saveLesson, blankSlide } from './store.js';
 import { $, $$, esc, toast, richText, readImage, confirmDialog, openDialog, uid } from './util.js';
 
@@ -89,8 +90,10 @@ export async function renderEditor(el, id) {
             <button type="button" class="alt-opt ${altKey(lesson.alt) === k ? 'on' : ''}" data-alt="${k}">
               ${avatarHTML(k, { framing: 'face' })}<span>${a.name} ${a.flag}</span></button>`).join('')}
         </div>
-        <label>生徒のレベル <small class="muted">ALTが話し方を合わせます（英語でも日本語でも可）</small>
-          <input id="level" value="${esc(lesson.level)}" placeholder="例：大学1〜2年生、CEFR A2〜B1"></label>
+        <div class="field-label">生徒の英語レベル（CEFR） <small class="muted">ALTが話すスピード・単語・文の長さを合わせます。授業画面でも変えられます</small></div>
+        <div class="level-row" id="cefr">${levelButtons(lesson.cefr)}</div>
+        <label>生徒について（任意） <small class="muted">学年・人数・興味など</small>
+          <input id="level" value="${esc(lesson.level)}" placeholder="例：大学1〜2年生、英語が苦手な学生が多い"></label>
         <label>ALTへの指示（授業の流れ・役割・台本） <small class="muted">ALTはこの内容に沿って動きます。英語で書くとより正確です</small>
           <textarea id="plan" rows="12" placeholder="例：When the teacher asks 'Where do you live?', answer with this script: ...">${esc(lesson.plan)}</textarea></label>
       </section>
@@ -107,6 +110,13 @@ export async function renderEditor(el, id) {
 
     $('#title', el).oninput = (e) => { lesson.title = e.target.value; save(); };
     $('#level', el).oninput = (e) => { lesson.level = e.target.value; save(); };
+    $('#cefr', el).onclick = (e) => {
+      const b = e.target.closest('[data-cefr]');
+      if (!b) return;
+      lesson.cefr = b.dataset.cefr;
+      $('#cefr', el).innerHTML = levelButtons(lesson.cefr);
+      save();
+    };
     $('#plan', el).oninput = (e) => { lesson.plan = e.target.value; save(); };
     $$('[data-alt]', el).forEach((b) => (b.onclick = () => {
       lesson.alt = b.dataset.alt;
@@ -234,4 +244,9 @@ export function slideView(s) {
       ${s.image ? `<figure><img src="${esc(s.image)}" alt=""></figure>` : ''}
       ${!hasText && !s.image ? '<div class="slide-blank"></div>' : ''}
     </div>`;
+}
+
+export function levelButtons(cur) {
+  const on = levelKey(cur);
+  return LEVEL_KEYS.map((k) => `<button type="button" class="lv ${k === on ? 'on' : ''}" data-cefr="${k}" title="${LEVELS[k].ja}"><b>${k}</b><small>${LEVELS[k].ja}</small></button>`).join('');
 }

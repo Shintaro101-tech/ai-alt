@@ -1,3 +1,4 @@
+import { DEFAULT_LEVEL, levelKey } from './levels.js';
 // Lessons are kept in this browser (IndexedDB, so pictures fit) and can be exported
 // as JSON files to keep or move to another computer.
 
@@ -47,6 +48,7 @@ export function blankLesson() {
     id: uid(),
     title: '新しいレッスン',
     alt: 'emma',
+    cefr: DEFAULT_LEVEL,
     level: '',
     plan: '',
     slides: [blankSlide()],
@@ -57,6 +59,7 @@ export const blankSlide = () => ({ id: uid(), title: '', body: '', image: '', no
 // Turns an imported JSON file (or a copy) into a lesson with fresh ids.
 export function normalizeLesson(raw, { fresh = true } = {}) {
   const l = { ...blankLesson(), ...raw };
+  l.cefr = levelKey(l.cefr);
   if (fresh) l.id = uid();
   l.slides = (Array.isArray(raw.slides) ? raw.slides : []).map((s) => ({ ...blankSlide(), ...s, id: uid() }));
   if (!l.slides.length) l.slides = [blankSlide()];

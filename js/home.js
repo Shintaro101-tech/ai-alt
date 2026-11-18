@@ -1,6 +1,7 @@
 // Lesson list.
 
 import { ALTS, avatarHTML, altKey } from './avatars.js';
+import { levelKey } from './levels.js';
 import { listLessons, saveLesson, deleteLesson, blankLesson, normalizeLesson, addSample, getLesson } from './store.js';
 import { ensurePasscode, getPasscode } from './api.js';
 import { $, $$, esc, toast, confirmDialog } from './util.js';
@@ -38,7 +39,7 @@ export async function renderHome(el) {
             <div class="lesson-av">${avatarHTML(altKey(l.alt), { framing: 'face' })}</div>
             <div class="lesson-info">
               <h3>${esc(l.title || '無題のレッスン')}</h3>
-              <p class="mini muted">ALT: ${ALTS[altKey(l.alt)].name} ・ スライド ${l.slides.length}枚${l.level ? ` ・ ${esc(l.level)}` : ''}</p>
+              <p class="mini muted">ALT: ${ALTS[altKey(l.alt)].name} ・ スライド ${l.slides.length}枚 ・ 英語 ${levelKey(l.cefr)}${l.level ? ` ・ ${esc(l.level)}` : ''}</p>
             </div>
             <div class="lesson-actions">
               <a class="btn btn-primary" href="#/class/${encodeURIComponent(l.id)}">▶ 授業を始める</a>

@@ -3,7 +3,8 @@
 export const SAMPLE_LESSON = {
   title: 'Second Conditional — My Home & Neighborhood',
   alt: 'emma',
-  level: 'Japanese university students, CEFR A2–B1',
+  cefr: 'A2',
+  level: 'Japanese university students',
   plan: `This is a 25-minute grammar lesson on the second conditional (If + past simple, would / could + verb), taught with a communicative approach:
 Pre-text task → Listening → Clarification → Controlled practice → Freer practice.
 

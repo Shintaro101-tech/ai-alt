@@ -5,7 +5,9 @@
 // shows only the slides.
 
 import { ALTS, avatarHTML, altKey, createMeter } from './avatars.js';
-import { getLesson } from './store.js';
+import { getLesson, saveLesson } from './store.js';
+import { LEVELS, levelKey } from './levels.js';
+import { levelButtons } from './editor.js';
 import { ensurePasscode } from './api.js';
 import { LiveSession } from './live.js';
 import { slideView } from './editor.js';
@@ -38,6 +40,7 @@ export async function renderClass(el, id) {
     blank: '', // '' | 'black' | 'white'
     pop: false, // in present mode: the newest board card shown over the slide
     jump: '', // typed slide number (then Enter), like PowerPoint
+    cefr: levelKey(lesson.cefr), // students' English level
   };
   let live = null;
   let meter = null;
@@ -62,6 +65,10 @@ export async function renderClass(el, id) {
         <div class="alt-name" id="altName"></div>
         <div class="alt-controls" id="controls"></div>
         <div class="alt-pick" id="pick"></div>
+        <div class="class-level">
+          <div class="class-level-title">生徒の英語レベル <small id="lvDesc"></small></div>
+          <div class="level-row compact" id="cefr"></div>
+        </div>
         <div class="ask" id="ask">
           <div class="ask-title">ALTにお願い <small>（声に出さずに伝わります）</small></div>
           <div class="chips">${QUICK.map((q, i) => `<button class="chip" data-quick="${i}">${q.label}</button>`).join('')}</div>
@@ -87,6 +94,24 @@ export async function renderClass(el, id) {
         <input name="w" placeholder="ALTへのお願い（Enterで送る・Escで閉じる）">
       </form>
     </div>`;
+
+  // ------------------------------------------------------------------ level
+  function drawLevel() {
+    $('#cefr', el).innerHTML = levelButtons(state.cefr);
+    $('#lvDesc', el).textContent = `${state.cefr}：${LEVELS[state.cefr].ja}`;
+  }
+  $('#cefr', el).onclick = (e) => {
+    const b = e.target.closest('[data-cefr]');
+    if (!b || b.dataset.cefr === state.cefr) return;
+    state.cefr = lesson.cefr = b.dataset.cefr;
+    drawLevel();
+    saveLesson(lesson).catch(() => {});
+    if (live) {
+      note(`[Teacher's private note — the class did not hear this; never read it aloud or mention it] The students' English level is now ${state.cefr}. From now on: ${LEVELS[state.cefr].guide} Don't say anything about this change; just use it from your next turn.`);
+      toast(`ALTの話し方を ${state.cefr} に変えました`);
+    }
+  };
+  drawLevel();
 
   // ------------------------------------------------------------------ ALT panel
   function drawAlt() {
@@ -567,6 +592,8 @@ function slideText(s) {
 
 function buildInstructions(lesson, state) {
   const a = ALTS[state.alt];
+  // The level buttons decide the level; drop an old "CEFR A2–B1" from the free text.
+  const about = (lesson.level || '').replace(/[,、]?\s*CEFR[\sA-C0-9+\-–~〜]*/gi, '').trim();
   const slides = lesson.slides.map((s, i) => {
     const text = slideText(s);
     return `Slide ${i + 1}${s.title ? ` (${s.title})` : ''}: ${text || '(picture only)'}${s.image ? ' [has a picture]' : ''}${s.note ? `\n  Note for you: ${s.note.replace(/\s*\n+\s*/g, ' ')}` : ''}`;
@@ -577,11 +604,13 @@ ${a.accent}
 
 THE CLASSROOM
 You appear on a big screen at the front of the classroom, next to a display that everyone can see. A Japanese teacher of English leads the lesson and you support them, like a real ALT. Everything you hear comes from the classroom microphone: usually the teacher, sometimes a student.
-${lesson.level ? `The students: ${lesson.level}. Adjust your English to their level.` : "Adjust your English to the students' level."}
+${about ? `About the students: ${about}.
+` : ''}THE STUDENTS' ENGLISH LEVEL (CEFR): ${LEVELS[state.cefr].guide}
+Always speak at this level — your speed, words, grammar and turn length — even when the lesson plan gives you a script (keep its meaning and target grammar, but say it at this level). If the teacher tells you that the level has changed, switch at once.
 
 HOW TO TALK
-- Speak clear, natural English, a little slower than usual, so the whole class can follow.
-- Keep your turns short (1-3 sentences), unless the teacher asks for a longer answer, a model answer or a story, or the lesson plan gives you a script.
+- Speak clear, natural English at the speed set by the students' level above, so the whole class can follow.
+- Keep your turns as short as the students' level above says, unless the teacher asks for a longer answer, a model answer or a story, or the lesson plan gives you a script.
 - The teacher leads. Follow the teacher's cues and don't start new activities by yourself. If you aren't sure what the teacher wants, ask briefly.
 - Never speak first. At the start of the lesson, wait silently until the teacher talks to you, and respond to what they actually said: if they greet you or introduce you to the class, greet everyone back and introduce yourself briefly by name; if they ask you a question, answer it.
 - Answer only when someone talks to you (they say your name, ask you a question, or the teacher turns to you). If speech is in Japanese or is clearly not addressed to you (students talking to each other, the teacher explaining in Japanese), stay silent.

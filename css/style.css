@@ -277,3 +277,19 @@ dialog h2 { margin: 0 0 8px; }
   .alt-stage { max-width: 320px; }
   .screen { aspect-ratio: 16 / 10; flex: none; }
 }
+
+/* Students' English level (CEFR) */
+.level-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.lv { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; font: inherit; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
+.lv b { font-size: 1rem; color: var(--navy); }
+.lv small { font-size: .7rem; color: var(--muted); line-height: 1.3; }
+.lv.on { border-color: var(--navy); background: var(--sun-soft); }
+.lv:hover { border-color: var(--navy-2); }
+.class-level { display: grid; gap: 4px; }
+.class-level-title { font-weight: 800; font-size: .8rem; color: var(--navy); text-align: center; }
+.class-level-title small { font-weight: 500; color: var(--muted); }
+.level-row.compact { gap: 3px; justify-content: center; }
+.level-row.compact .lv { min-width: 0; padding: 3px 6px; border-radius: 8px; border-width: 2px; }
+.level-row.compact .lv b { font-size: .75rem; }
+.level-row.compact .lv small { display: none; }
+.classroom.present .class-level { display: none; }
