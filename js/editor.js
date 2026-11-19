@@ -28,6 +28,8 @@ export async function renderEditor(el, id) {
     }, 700);
   };
 
+  const pics = () => (Array.isArray(lesson.pictures) ? lesson.pictures : []);
+
   const tools = (i) => `
     <div class="row">
       <button class="btn btn-ghost btn-sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="上へ">↑</button>
@@ -99,6 +101,20 @@ export async function renderEditor(el, id) {
           <textarea id="plan" rows="12" placeholder="例：When the teacher asks 'Where do you live?', answer with this script: ...">${esc(lesson.plan)}</textarea></label>
       </section>
       <div class="section-head">
+        <h2>ALT が見せる画像</h2>
+      </div>
+      <p class="mini muted">写真やイラストに名前を付けて登録すると、ALT が話の流れに合わせてボードに出します（授業画面の「🖼 画像を出す」から先生が出すこともできます）。名前は ALT が呼ぶときに使うので、英語で短く付けるのがおすすめです。</p>
+      <div class="pics" id="pics">
+        ${pics().map((p, i) => `
+          <div class="pic-edit" data-p="${i}">
+            <img src="${esc(p.src)}" alt="">
+            <input data-pf="name" value="${esc(p.name)}" placeholder="名前（例：Onna Village）" aria-label="画像の名前">
+            <input data-pf="note" value="${esc(p.note)}" placeholder="ALTへの説明（任意）" aria-label="ALTへの説明">
+            <button type="button" class="btn btn-ghost btn-sm" data-pdel>🗑 削除</button>
+          </div>`).join('')}
+        <label class="pic-add">🖼 画像を追加<small class="mini">（複数選べます）</small><input type="file" accept="image/*" multiple id="picFile" hidden></label>
+      </div>
+      <div class="section-head">
         <h2>ディスプレイのスライド</h2>
         <div class="row">
           <button class="btn btn-ghost" id="ppt">📥 PowerPoint を読み込む</button>
@@ -130,6 +146,29 @@ export async function renderEditor(el, id) {
       draw();
       $$('.slide-edit', el).pop()?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
+    $('#picFile', el).onchange = async (e) => {
+      const files = [...e.target.files];
+      e.target.value = '';
+      lesson.pictures = pics();
+      for (const f of files) {
+        try {
+          const name = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+          lesson.pictures.push({ id: uid(), name, note: '', src: await readImage(f, 1400) });
+        } catch (err) { toast(`${f.name}: ${err.message}`, 'error'); }
+      }
+      save();
+      draw();
+    };
+    $$('.pic-edit', el).forEach((card) => {
+      const p = pics()[+card.dataset.p];
+      $$('[data-pf]', card).forEach((f) => (f.oninput = () => { p[f.dataset.pf] = f.value; save(); }));
+      $('[data-pdel]', card).onclick = async () => {
+        if (!(await confirmDialog(`画像「${p.name}」を削除しますか？`, '削除'))) return;
+        lesson.pictures = pics().filter((x) => x !== p);
+        save();
+        draw();
+      };
+    });
     $('#ppt', el).onclick = () => $('#pptFile', el).click();
     $('#pptFile', el).onchange = (e) => importDeck(e.target.files[0]);
 

@@ -52,6 +52,7 @@ export function blankLesson() {
     level: '',
     plan: '',
     slides: [blankSlide()],
+    pictures: [],
   };
 }
 export const blankSlide = () => ({ id: uid(), title: '', body: '', image: '', note: '' });
@@ -63,6 +64,8 @@ export function normalizeLesson(raw, { fresh = true } = {}) {
   if (fresh) l.id = uid();
   l.slides = (Array.isArray(raw.slides) ? raw.slides : []).map((s) => ({ ...blankSlide(), ...s, id: uid() }));
   if (!l.slides.length) l.slides = [blankSlide()];
+  l.pictures = (Array.isArray(raw.pictures) ? raw.pictures : []).filter((p) => p?.src)
+    .map((p) => ({ id: uid(), name: String(p.name || ''), note: String(p.note || ''), src: p.src }));
   return l;
 }
 

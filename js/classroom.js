@@ -10,11 +10,12 @@ import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.
 import { levelButtons } from './editor.js';
 import { SoundPlayer } from './sound.js';
 import { openDeviceCheck } from './devices.js';
+import { VISUAL_KINDS, normalizeVisual, visualHTML, visualSummary, pictureHTML, findPicture } from './visuals.js';
 import { ensurePasscode } from './api.js';
 import { LiveSession } from './live.js';
 import { slideView } from './editor.js';
 import { Stage, preload } from './deck.js';
-import { $, $$, esc, toast } from './util.js';
+import { $, $$, esc, toast, openDialog } from './util.js';
 
 const QUICK = [
   { label: '💡 このスライドを説明', say: 'Please explain the slide that is on the display now to the class, briefly and simply.' },
@@ -47,6 +48,7 @@ export async function renderClass(el, id) {
   };
   let live = null;
   const sounds = new SoundPlayer(() => onSoundChange());
+  const pictures = () => (Array.isArray(lesson.pictures) ? lesson.pictures : []);
   let meter = null;
   let stage = null;
   let slideTimer = 0;
@@ -229,8 +231,9 @@ export async function renderClass(el, id) {
         ? `<div class="board">${state.board.map((c, i) => cardHTML(c, i === 0)).join('')}</div>`
         : `<div class="screen-empty"><p>ALTが会話の中で大事な表現や質問をここに書きます。</p>
            <p class="mini">「<b>Can you write it on the board?</b>」と頼むこともできます。</p></div>`;
-      nav.innerHTML = state.board.length ? '<button class="btn btn-ghost btn-sm" id="clear">ボードを消す</button>' : '';
+      nav.innerHTML = `${pictures().length ? '<button class="btn btn-ghost btn-sm" id="picBtn">🖼 画像を出す</button>' : ''}${state.board.length ? '<button class="btn btn-ghost btn-sm" id="clear">ボードを消す</button>' : ''}`;
       $('#clear', el)?.addEventListener('click', () => { state.board = []; drawDisplay(); });
+      $('#picBtn', el)?.addEventListener('click', pickPicture);
     } else {
       screen.classList.remove('dark');
       screen.innerHTML = `<div class="script" id="script">${scriptHTML()}</div>`;
@@ -260,6 +263,8 @@ export async function renderClass(el, id) {
   }
 
   function cardHTML(c, latest) {
+    if (c.style === 'visual') return `<div class="card-b visual ${latest ? 'latest' : ''}">${c.heading ? `<h3>${esc(c.heading)}</h3>` : ''}${visualHTML(c.visual)}</div>`;
+    if (c.style === 'picture') return `<div class="card-b picture ${latest ? 'latest' : ''}">${c.heading ? `<h3>${esc(c.heading)}</h3>` : ''}${pictureHTML(pictures().find((p) => p.id === c.picture), c.caption)}</div>`;
     const items = c.items.map((it) => {
       if (c.style === 'vocabulary') return `<li><b>${esc(it.text)}</b>${it.note ? `<span>${esc(it.note)}</span>` : ''}</li>`;
       return `<li>${esc(it.text)}${it.note ? `<span>${esc(it.note)}</span>` : ''}</li>`;
@@ -368,7 +373,40 @@ export async function renderClass(el, id) {
       .filter((it) => it?.text);
     if (!items.length) return { ok: false, error: 'nothing to show' };
     const style = ['questions', 'vocabulary', 'note'].includes(args.style) ? args.style : 'note';
-    state.board.unshift({ heading: args.heading || 'Note', style, items });
+    putOnBoard({ heading: args.heading || 'Note', style, items });
+    return { ok: true, shown: true };
+  }
+  function showVisual(args) {
+    const visual = normalizeVisual(args);
+    if (!visual) return { ok: false, error: `Nothing to draw. kind must be one of ${VISUAL_KINDS.join(', ')}, with its data.` };
+    putOnBoard({ heading: args.heading || '', style: 'visual', visual });
+    return { ok: true, shown: true };
+  }
+  function showPicture(args) {
+    const pic = findPicture(pictures(), args.name);
+    if (!pic) return { ok: false, error: `No picture called "${args.name}". Available: ${pictures().map((p) => p.name).join(', ') || 'none'}.` };
+    putOnBoard({ heading: args.heading || '', style: 'picture', picture: pic.id, caption: args.caption || '' });
+    return { ok: true, shown: pic.name };
+  }
+  // The teacher shows a picture from the library (the ALT is told what is on the board).
+  function pickPicture() {
+    const dlg = openDialog(`
+      <form class="form">
+        <h2>🖼 ボードに画像を出す</h2>
+        <div class="pics">${pictures().map((p) => `
+          <button type="button" class="pic-edit" data-pic="${esc(p.id)}"><img src="${esc(p.src)}" alt=""><b>${esc(p.name)}</b></button>`).join('')}</div>
+        <div class="actions"><button type="button" class="btn btn-ghost" data-close>閉じる</button></div>
+      </form>`);
+    dlg.querySelectorAll('[data-pic]').forEach((b) => (b.onclick = () => {
+      const pic = pictures().find((p) => p.id === b.dataset.pic);
+      dlg.close();
+      if (!pic) return;
+      putOnBoard({ heading: '', style: 'picture', picture: pic.id, caption: '' });
+      if (live) note(`[Display update — do not respond to this message] The teacher put the picture "${pic.name}" on your board${pic.note ? ` (${pic.note})` : ''}.`);
+    }));
+  }
+  function putOnBoard(card) {
+    state.board.unshift(card);
     if (state.present) {
       // Over the slide; the next click or key closes it.
       state.pop = true;
@@ -378,7 +416,6 @@ export async function renderClass(el, id) {
     }
     state.unseen = false;
     drawDisplay();
-    return { ok: true, shown: true };
   }
   function showSlide(args) {
     const n = Math.round(Number(args.number));
@@ -419,7 +456,10 @@ export async function renderClass(el, id) {
     let cue = "[Display update — do not respond to this message] The lesson has started. Don't say anything yet. Wait silently until the teacher speaks to you, then respond to exactly what they said.";
     if (resume) {
       const transcript = state.turns.map((t) => `${t.role === 'alt' ? 'You' : 'Class'}: ${t.text}`).join('\n').slice(-8000);
-      const shown = state.board.map((c) => `${c.heading}: ${c.items.map((i) => i.text).join(' | ')}`).join('\n');
+      const shown = state.board.map((c) => `${c.heading ? `${c.heading}: ` : ''}${
+        c.style === 'visual' ? visualSummary(c.visual)
+        : c.style === 'picture' ? `picture "${pictures().find((p) => p.id === c.picture)?.name || ''}"`
+        : c.items.map((i) => i.text).join(' | ')}`).join('\n');
       instructions += `\n\nRESUMED LESSON
 You were away for a moment and the teacher has called you back. Don't start over or introduce yourself again. The conversation so far:
 ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
@@ -436,7 +476,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
           type: 'responses',
           responses: {
             instructions: BACKEND_INSTRUCTIONS,
-            tools: [BOARD_TOOL, SLIDE_TOOL],
+            tools: [BOARD_TOOL, VISUAL_TOOL, ...(pictures().length ? [PICTURE_TOOL] : []), SLIDE_TOOL],
             tool_choice: 'auto',
             parallel_tool_calls: false,
           },
@@ -469,6 +509,8 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
       },
       onFunctionCall: (fn, args) => {
         if (fn === 'show_on_board') return showOnBoard(args);
+        if (fn === 'show_visual') return showVisual(args);
+        if (fn === 'show_picture') return showPicture(args);
         if (fn === 'show_slide') return showSlide(args);
         return { ok: false, error: 'unknown function' };
       },
@@ -692,6 +734,7 @@ function slideText(s) {
 
 function buildInstructions(lesson, state) {
   const a = ALTS[state.alt];
+  const pics = Array.isArray(lesson.pictures) ? lesson.pictures : [];
   // The level buttons decide the level; drop an old "CEFR A2–B1" from the free text.
   const about = (lesson.level || '').replace(/[,、]?\s*CEFR[\sA-C0-9+\-–~〜]*/gi, '').trim();
   const slides = lesson.slides.map((s, i) => {
@@ -730,15 +773,37 @@ The display is showing slide ${state.slide + 1} now.
 You can change the display by delegating a request:
 - to show slide N (only when the teacher asks you to, or when it clearly helps the teacher's activity);
 - to write something on your board: a key expression, a model sentence, questions, a correction, or anything the teacher or a student asks you to write ("Can you write it on the board?"). Give the exact text to show.
-IMPORTANT: the display only changes when you delegate. Whenever you say you'll write or show something, delegate it in the same turn with the full text — never just say it. Keep board text short. You can say "I've put it on the board."`;
+- to draw a diagram or chart on your board when a picture makes an explanation clearer, or when the teacher asks ("Can you show it in a diagram?"). Say exactly what to draw and with which words or numbers. You can draw:
+  * reality vs imagination — the real situation next to the imagined one, with the "distance" between them (great for conditionals and wishes);
+  * a timeline — past / now / future, with real events on the line and imagined ones in dream bubbles (tenses, conditionals);
+  * a bar chart or a line chart — numbers such as class survey results, prices or temperatures;
+  * a table — comparisons or grammar patterns;
+  * a Venn diagram — what two things have in common and how they differ;
+  * steps — a process or the order of a story;
+  * emoji picture cards — words with an emoji picture each (vocabulary, ideas).
+${pics.length ? `- to show one of the teacher's pictures on your board (use the exact name):
+${pics.map((p) => `  * "${p.name}"${p.note ? ` — ${p.note.replace(/\s*\n+\s*/g, ' ')}` : ''}`).join('\n')}
+` : ''}IMPORTANT: the display only changes when you delegate. Whenever you say you'll write, draw or show something, delegate it in the same turn with the full content — never just say it. Keep board text short. Don't draw more than the moment needs: one clear diagram is better than several. You can say "I've put it on the board."`;
 }
 
-const BACKEND_INSTRUCTIONS = `You are the backend helper for AI-ALT, an AI assistant language teacher used in English classes in Japan. The voice ALT delegates display tasks to you. You have two functions:
+const BACKEND_INSTRUCTIONS = `You are the backend helper for AI-ALT, an AI assistant language teacher used in English classes in Japan. The voice ALT delegates display tasks to you. You have these functions:
 
 show_on_board — write on the ALT's board, which the whole class can see. Use the exact content you were given and keep it concise.
   - style "questions": questions (one per item, no numbering — the app numbers them).
   - style "vocabulary": words or expressions. text = the English expression; note = a short Japanese meaning, optionally followed by " / " and a short English example.
   - style "note": anything else (a model sentence, a grammar pattern, a correction, a list, a spelling). For a correction, text = the better version and note = a short Japanese explanation.
+
+show_visual — draw a diagram or chart on the board. Pick the kind that fits and fill in only its fields:
+  - "reality": reality {text, note}, imagination {text, note}, gap_label (e.g. "past tense = distance"). For conditionals: reality "I have a small kitchen." / imagination "If I had a bigger kitchen, I would invite my friends."
+  - "timeline": events [{text, time: past|now|future, real: true for facts, false for imagined}]
+  - "bar_chart" / "line_chart": labels [...], series [{name, values [numbers]}], unit (optional, e.g. "%", "yen")
+  - "table": columns [...], rows [[...], ...]
+  - "venn": left {title, items}, right {title, items}, both [...]
+  - "steps": items [{text, note, emoji}]
+  - "emoji_cards": items [{emoji, text, note}] (one fitting emoji each)
+  heading is optional and short; caption is an optional one-line explanation. Keep every label short (a few words).
+
+show_picture — show one of the teacher's pictures by its exact name.
 
 show_slide — show one of the teacher's slides (1-based number).
 
@@ -766,6 +831,60 @@ const BOARD_TOOL = {
       },
     },
     required: ['heading', 'style', 'items'],
+  },
+};
+
+const VISUAL_TOOL = {
+  type: 'function',
+  name: 'show_visual',
+  description: "Draw a diagram or chart on the ALT's board (reality vs imagination, timeline, bar/line chart, table, Venn diagram, steps, emoji picture cards).",
+  parameters: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['reality', 'timeline', 'bar_chart', 'line_chart', 'table', 'venn', 'steps', 'emoji_cards'] },
+      heading: { type: 'string', description: 'Optional short heading.' },
+      caption: { type: 'string', description: 'Optional one-line explanation under the drawing.' },
+      reality: { type: 'object', properties: { text: { type: 'string' }, note: { type: 'string' } }, description: 'reality: the real situation.' },
+      imagination: { type: 'object', properties: { text: { type: 'string' }, note: { type: 'string' } }, description: 'reality: the imagined situation.' },
+      gap_label: { type: 'string', description: 'reality: what the distance means, e.g. "past tense = distance from reality".' },
+      events: {
+        type: 'array',
+        description: 'timeline: events.',
+        items: { type: 'object', properties: { text: { type: 'string' }, time: { type: 'string', enum: ['past', 'now', 'future'] }, real: { type: 'boolean' } }, required: ['text', 'time'] },
+      },
+      labels: { type: 'array', items: { type: 'string' }, description: 'bar_chart / line_chart: category labels.' },
+      series: {
+        type: 'array',
+        description: 'bar_chart / line_chart: one or more data series.',
+        items: { type: 'object', properties: { name: { type: 'string' }, values: { type: 'array', items: { type: 'number' } } }, required: ['values'] },
+      },
+      unit: { type: 'string', description: 'bar_chart / line_chart: unit shown after numbers.' },
+      columns: { type: 'array', items: { type: 'string' }, description: 'table: column headings.' },
+      rows: { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'table: rows of cells.' },
+      left: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'string' } } }, description: 'venn: left circle.' },
+      right: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'string' } } }, description: 'venn: right circle.' },
+      both: { type: 'array', items: { type: 'string' }, description: 'venn: what both share.' },
+      items: {
+        type: 'array',
+        description: 'steps / emoji_cards: the items.',
+        items: { type: 'object', properties: { text: { type: 'string' }, note: { type: 'string' }, emoji: { type: 'string' } }, required: ['text'] },
+      },
+    },
+    required: ['kind'],
+  },
+};
+
+const PICTURE_TOOL = {
+  type: 'function',
+  name: 'show_picture',
+  description: "Show one of the teacher's pictures on the ALT's board.",
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'The exact name of the picture.' },
+      caption: { type: 'string', description: 'Optional short caption.' },
+    },
+    required: ['name'],
   },
 };
 

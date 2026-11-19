@@ -405,3 +405,56 @@ dialog:has(.devcheck) { width: min(520px, 94vw); }
 .dev-meter span { display: block; height: 100%; width: 0; background: #9DB3CF; border-radius: 99px; transition: width .06s linear; }
 .dev-meter span.loud { background: var(--ok); }
 .classroom.present .dev-btn { display: none; }
+
+/* diagrams, charts and pictures on the ALT's board */
+.card-b.visual, .card-b.picture { font-size: 2cqw; }
+.card-b.latest.visual, .card-b.latest.picture { font-size: 2.6cqw; }
+.viz svg { display: block; width: 100%; height: auto; max-height: 62cqh; font-family: var(--font); }
+.board-pop .viz svg { max-height: 58cqh; }
+.viz text { text-anchor: middle; fill: #13233A; }
+.viz .t-axis { font-size: 26px; font-weight: 800; fill: #123A6B; }
+.viz .t-real { font-size: 26px; font-weight: 700; }
+.viz .t-dream { font-size: 24px; font-weight: 700; fill: #9A4A0C; }
+.viz .c-y { text-anchor: end; font-size: 24px; fill: #63718A; }
+.viz .c-x { font-size: 26px; font-weight: 700; }
+.viz .c-val { font-size: 24px; font-weight: 800; fill: #123A6B; }
+.viz .c-leg { text-anchor: start; font-size: 24px; font-weight: 700; }
+.viz .v-title { font-size: 34px; font-weight: 800; }
+.viz .v-item { font-size: 26px; font-weight: 700; }
+.viz-cap { margin: .5em 0 0; color: var(--muted); font-size: .8em; text-align: center; }
+.rv { display: grid; grid-template-columns: 1fr auto 1fr; gap: .6em; align-items: stretch; }
+.rv-box { border-radius: 1em; padding: .7em .9em; display: grid; gap: .3em; align-content: start; }
+.rv-box.real { background: #E3EEFA; border: 3px solid #1E5AA0; }
+.rv-box.dream { background: #FFF3E6; border: 3px dashed #E8833A; }
+.rv-box b { font-size: 1.05em; line-height: 1.35; }
+.rv-box span { color: var(--muted); font-size: .8em; }
+.rv-tag { font-weight: 800; font-size: .75em; color: var(--navy); }
+.rv-tag small { font-weight: 700; color: var(--muted); }
+.rv-gap { display: grid; place-items: center; font-weight: 800; color: #C2410C; font-size: .8em; writing-mode: horizontal-tb; white-space: nowrap; }
+.viz-table { border-collapse: collapse; width: 100%; background: #fff; }
+.viz-table th, .viz-table td { border: 2px solid var(--line); padding: .35em .6em; text-align: left; }
+.viz-table th { background: var(--navy-2); color: #fff; }
+.viz-table tbody tr:nth-child(even) td { background: var(--surface-2); }
+.viz-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5em; align-items: center; }
+.viz-steps li { display: flex; gap: .5em; align-items: center; background: #fff; border: 2px solid var(--line); border-radius: .8em; padding: .4em .7em; }
+.viz-steps li.arrow { border: none; background: none; padding: 0; color: var(--navy-2); font-weight: 800; }
+.viz-steps .n { display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--navy-2); color: #fff; font-weight: 800; flex: none; }
+.viz-steps small, .ecard small { display: block; color: var(--muted); font-size: .75em; }
+.viz-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(7em, 1fr)); gap: .5em; }
+.ecard { background: #fff; border: 2px solid var(--line); border-radius: .8em; padding: .5em; text-align: center; }
+.ecard .em { font-size: 2.2em; line-height: 1.2; }
+.viz-pic { margin: 0; text-align: center; }
+.viz-pic img { max-width: 100%; max-height: 60cqh; border-radius: 12px; object-fit: contain; }
+.board-pop .viz-pic img { max-height: 56cqh; }
+.viz-pic figcaption { margin-top: .3em; font-weight: 700; color: var(--navy); }
+@media (max-width: 860px) { .card-b.visual, .card-b.picture, .card-b.latest.visual, .card-b.latest.picture { font-size: 14px; } }
+
+/* picture library in the editor and the teacher's picture menu */
+.pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.pic-edit { border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: grid; gap: 6px; background: #fff; }
+.pic-edit img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--surface-2); border-radius: 8px; }
+.pic-edit input { padding: 6px 8px; font-size: .85rem; }
+.pic-add { display: grid; place-items: center; min-height: 150px; border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; color: var(--muted); font-weight: 700; }
+.pic-menu { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.pic-menu button { display: flex; align-items: center; gap: 6px; }
+.pic-menu img { width: 34px; height: 26px; object-fit: cover; border-radius: 4px; }
