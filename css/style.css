@@ -391,3 +391,17 @@ dialog h2 { margin: 0 0 8px; }
 .display-nav { position: relative; }
 .display-nav .snd-stop { position: absolute; right: 0; top: 50%; transform: translateY(-30%); margin: 0; }
 @media (max-width: 860px) { .display-nav .snd-stop { position: static; transform: none; } }
+
+/* microphone & speaker check */
+.dev-btn.wide { flex-basis: 100%; max-width: 260px; }
+.devcheck { width: 100%; }
+dialog:has(.devcheck) { width: min(520px, 94vw); }
+.dev-block { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; display: grid; gap: 6px; }
+.dev-block p { margin: 0; }
+.dev-title { font-weight: 700; color: var(--navy); }
+.devcheck select { font: inherit; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--text); }
+.dev-block .btn { justify-self: start; }
+.dev-meter { height: 12px; border-radius: 99px; background: #E4EAF2; overflow: hidden; }
+.dev-meter span { display: block; height: 100%; width: 0; background: #9DB3CF; border-radius: 99px; transition: width .06s linear; }
+.dev-meter span.loud { background: var(--ok); }
+.classroom.present .dev-btn { display: none; }

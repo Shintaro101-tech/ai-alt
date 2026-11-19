@@ -9,6 +9,7 @@ import { getLesson, saveLesson } from './store.js';
 import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.js';
 import { levelButtons } from './editor.js';
 import { SoundPlayer } from './sound.js';
+import { openDeviceCheck } from './devices.js';
 import { ensurePasscode } from './api.js';
 import { LiveSession } from './live.js';
 import { slideView } from './editor.js';
@@ -170,12 +171,16 @@ export async function renderClass(el, id) {
         <button class="btn btn-ghost" id="stop">⏹ 終了</button>`;
       $('#mic', el).onclick = toggleMic;
       $('#stop', el).onclick = () => stop();
+      c.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm dev-btn" id="devices" title="マイク・スピーカーの切り替え">🎧</button>');
     } else if (state.status === 'connecting') {
       c.innerHTML = '<button class="btn btn-primary" disabled>接続中…</button>';
     } else {
       c.innerHTML = `<button class="btn btn-primary big" id="start">${state.turns.length ? '▶ 再開する' : `▶ ${ALTS[state.alt].name} を呼ぶ`}</button>`;
       $('#start', el).onclick = () => start();
+      c.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm dev-btn wide" id="devices">🎧 マイク・スピーカーの確認</button>');
     }
+    const dev = $('#devices', el);
+    if (dev) dev.onclick = checkDevices;
     $('#ask', el).classList.toggle('off', state.status !== 'live');
   }
 
@@ -481,6 +486,17 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
       drawAlt();
       drawControls();
     }
+  }
+
+  // Before the lesson (or during it): choose and test the microphone and speaker.
+  function checkDevices() {
+    openDeviceCheck({
+      onChange: (kind) => {
+        if (kind === 'mic' && live) {
+          live.switchMic().then(() => toast('マイクを切り替えました'), () => toast('マイクを切り替えられませんでした', 'error'));
+        }
+      },
+    });
   }
 
   async function stop() {

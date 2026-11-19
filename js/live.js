@@ -7,6 +7,7 @@
 //       https://developers.openai.com/api/docs/guides/live-delegation
 
 import { relayPost } from './api.js';
+import { openMic, useSpeaker, forgetSpeaker } from './devices.js';
 
 export class LiveSession {
   constructor({ session, onEvent, onStatus, onRemoteStream, onFunctionCall }) {
@@ -18,7 +19,7 @@ export class LiveSession {
   async start() {
     this.onStatus?.('connecting');
     this.pc = new RTCPeerConnection();
-    this.audioEl = new Audio();
+    this.audioEl = useSpeaker(new Audio());
     this.audioEl.autoplay = true;
     this.pc.ontrack = (e) => {
       const stream = e.streams[0] || new MediaStream([e.track]);
@@ -29,9 +30,7 @@ export class LiveSession {
       if (['failed', 'disconnected'].includes(this.pc.connectionState) && !this.closed) this.onStatus?.('lost');
     };
 
-    this.mic = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
+    this.mic = await openMic();
     this.mic.getTracks().forEach((t) => this.pc.addTrack(t, this.mic));
 
     // Data channel must exist before the offer.
@@ -127,6 +126,20 @@ export class LiveSession {
     }
   }
 
+  // Another microphone chosen during the lesson: swap it in without reconnecting.
+  async switchMic() {
+    if (this.closed || !this.pc) return;
+    const next = await openMic();
+    const track = next.getAudioTracks()[0];
+    const sender = this.pc.getSenders().find((s) => s.track?.kind === 'audio');
+    if (sender && track) {
+      track.enabled = this.mic?.getAudioTracks()[0]?.enabled ?? true;
+      await sender.replaceTrack(track);
+    }
+    this.mic?.getTracks().forEach((t) => t.stop());
+    this.mic = next;
+  }
+
   setMuted(muted) {
     this.send({ type: muted ? 'session.input_audio.mute' : 'session.input_audio.unmute', event_id: `mute_${Date.now()}` });
   }
@@ -149,7 +162,7 @@ export class LiveSession {
     this.mic?.getTracks().forEach((t) => t.stop());
     try { this.dc?.close(); } catch {}
     try { this.pc?.close(); } catch {}
-    if (this.audioEl) this.audioEl.srcObject = null;
+    if (this.audioEl) { this.audioEl.srcObject = null; forgetSpeaker(this.audioEl); }
     this.onStatus?.('ended');
   }
 }

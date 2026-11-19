@@ -1,6 +1,8 @@
 // Sounds from PowerPoint: sound effects on clicks and slide transitions (short, fire and forget)
 // and audio on a slide ("tracks": music, a recording) that can keep playing over several slides.
 
+import { useSpeaker, forgetSpeaker } from './devices.js';
+
 export class SoundPlayer {
   constructor(onChange) {
     this.onChange = onChange || (() => {});
@@ -31,11 +33,11 @@ export class SoundPlayer {
   }
 
   effect(src, loop = false) {
-    const a = new Audio(src);
+    const a = useSpeaker(new Audio(src));
     a.loop = loop;
     this.effects.add(a);
-    a.onended = () => this.effects.delete(a);
-    a.play().catch(() => this.effects.delete(a));
+    a.onended = () => { this.effects.delete(a); forgetSpeaker(a); };
+    a.play().catch(() => { this.effects.delete(a); forgetSpeaker(a); });
   }
 
   track(snd, slideIndex) {
@@ -50,13 +52,13 @@ export class SoundPlayer {
     }
     if (snd.cmd === 'stop') { this.stop(snd.id); return; }
     if (cur) this.stop(snd.id);
-    const audio = new Audio(snd.src);
+    const audio = useSpeaker(new Audio(snd.src));
     audio.volume = Math.max(0, Math.min(1, snd.vol ?? 1));
     audio.loop = Boolean(snd.loop);
     audio.currentTime = snd.from || 0;
     const t = { audio, first: slideIndex, last: slideIndex + Math.max(1, snd.slides || 1) - 1, name: snd.name || '' };
     this.tracks.set(snd.id, t);
-    audio.onended = () => { if (this.tracks.get(snd.id) === t) { this.tracks.delete(snd.id); this.onChange(); } };
+    audio.onended = () => { forgetSpeaker(audio); if (this.tracks.get(snd.id) === t) { this.tracks.delete(snd.id); this.onChange(); } };
     audio.onplay = audio.onpause = () => this.onChange();
     audio.play().catch(() => { this.tracks.delete(snd.id); this.onChange(); });
     this.onChange();
@@ -76,6 +78,7 @@ export class SoundPlayer {
     if (!t) return;
     t.audio.onended = t.audio.onplay = t.audio.onpause = null;
     t.audio.pause();
+    forgetSpeaker(t.audio);
     this.tracks.delete(id);
     if (!quiet) this.onChange();
   }
@@ -84,7 +87,7 @@ export class SoundPlayer {
     for (const id of this.timers) clearTimeout(id);
     this.timers.clear();
     for (const id of [...this.tracks.keys()]) this.stop(id, true);
-    for (const a of this.effects) a.pause();
+    for (const a of this.effects) { a.pause(); forgetSpeaker(a); }
     this.effects.clear();
     this.onChange();
   }
