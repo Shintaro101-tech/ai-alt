@@ -2,7 +2,7 @@
 // The owner's passcode is asked once and remembered in this browser.
 
 import { WORKER_URL } from './config.js';
-import { openDialog, esc } from './util.js';
+import { openDialog, onDialogClose, esc } from './util.js';
 
 const KEY_PASS = 'aialt:passcode';
 export const getPasscode = () => { try { return localStorage.getItem(KEY_PASS) || ''; } catch { return ''; } };
@@ -53,7 +53,7 @@ export function ensurePasscode(message = '', force = false) {
         return false;
       },
     });
-    dlg.addEventListener('close', () => resolve(ok), { once: true });
+    onDialogClose(dlg, () => resolve(ok));
   });
 }
 

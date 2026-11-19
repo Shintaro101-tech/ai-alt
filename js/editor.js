@@ -6,7 +6,7 @@
 import { ALTS, avatarHTML, altKey } from './avatars.js';
 import { LEVELS, LEVEL_KEYS, levelKey } from './levels.js';
 import { getLesson, saveLesson, blankSlide } from './store.js';
-import { $, $$, esc, toast, richText, readImage, confirmDialog, openDialog, uid } from './util.js';
+import { $, $$, esc, toast, richText, readImage, confirmDialog, openDialog, onDialogClose, uid } from './util.js';
 
 export async function renderEditor(el, id) {
   const lesson = await getLesson(id);
@@ -211,7 +211,7 @@ export async function renderEditor(el, id) {
             </div>
           </form>`);
         $$('[data-pick]', dlg).forEach((b) => (b.onclick = () => { pick = b.dataset.pick; dlg.close(); }));
-        dlg.addEventListener('close', () => resolve(pick), { once: true });
+        onDialogClose(dlg, () => resolve(pick));
       });
       if (!mode) return;
     }
@@ -334,7 +334,7 @@ async function convertViaBridge(file) {
           <button class="btn btn-primary">▶ 変換を始める</button>
         </div>
       </form>`, { onSubmit: () => { ok = true; } });
-    dlg.addEventListener('close', () => resolve(ok), { once: true });
+    onDialogClose(dlg, () => resolve(ok));
   });
   if (!go) return null;
   // Opened right after the click (still counts as the user's action).

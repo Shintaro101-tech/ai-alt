@@ -19,6 +19,17 @@ export function toast(msg, kind = 'info') {
 }
 
 // Opens the shared <dialog>. `onSubmit(formData, form)` may return false to keep it open.
+// All dialogs share one <dialog>. A "close" event from the previous dialog can arrive after the next one
+// has opened, so a close only counts when the dialog is really closed.
+export function onDialogClose(dlg, fn) {
+  const handler = () => {
+    if (dlg.open) return;
+    dlg.removeEventListener('close', handler);
+    fn();
+  };
+  dlg.addEventListener('close', handler);
+}
+
 export function openDialog(html, { onSubmit, onOpen } = {}) {
   const dlg = $('#dialog');
   dlg.innerHTML = html;
@@ -47,7 +58,7 @@ export function confirmDialog(message, okLabel = 'OK') {
           <button class="btn btn-danger">${esc(okLabel)}</button>
         </div>
       </form>`, { onSubmit: () => { ok = true; } });
-    dlg.addEventListener('close', () => resolve(ok), { once: true });
+    onDialogClose(dlg, () => resolve(ok));
   });
 }
 
