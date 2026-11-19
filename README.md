@@ -53,11 +53,16 @@ GPT-Live には速さの設定がないため、レベルと速さから「1分�
 
 ## PowerPoint を読み込む
 
-1. `tools/スライドを変換.command` をダブルクリックし、PowerPoint ファイル（.pptx）を選ぶ
-   - 初回は「開発元が未確認」と出たら、右クリック →「開く」
-   - PowerPoint が自動で開いて閉じます（「ファイルへのアクセス」を聞かれたら許可）
-2. 同じフォルダに `○○.aialt-slides.json` ができる
-3. AI-ALT のレッスン編集 →「📥 PowerPoint を読み込む」でそのファイルを選ぶ
+**最初に1回だけ**：`tools/変換係をインストール.command` をダブルクリック（「開発元が未確認」と出たら右クリック →「開く」）。
+このMacに「変換係」が登録され、ログインするたびに裏で自動的に動きます。
+
+あとは、AI-ALT のレッスン編集で「📥 PowerPoint を読み込む」から **.pptx を選ぶか、画面にドラッグする**だけ。変換係が PowerPoint で変換し、そのまま読み込まれます（PowerPoint が一瞬開いて閉じます）。
+
+- 初めての変換で Mac から「PowerPoint を操作する」などの許可を聞かれたら「OK／許可」
+- Chrome に「ローカルネットワーク上のデバイスへのアクセス」を聞かれたら「許可」
+- 変換係をやめる：`tools/変換係をアンインストール.command`
+- 記録（うまくいかないとき）：`~/Library/Logs/AI-ALT-helper.log`
+- 変換係を使わない方法：`tools/スライドを変換.command` で .pptx を選ぶ → できた `○○.aialt-slides.json` を「📥 PowerPoint を読み込む」で選ぶ
 
 - クリックごとの状態を PowerPoint 自身が描くので、見た目は元のスライドと同じです
 - アニメーションは「フェード・スライドイン・ワイプ・ズーム・浮き上がり・アピア」を再現（その他はフェード）。画面切り替えはクロスフェード
@@ -106,5 +111,5 @@ js/store.js      レッスンの保存（IndexedDB）
 js/sample.js     サンプルレッスン
 assets/avatars/  アバター画像（洋書トークからコピー）
 assets/lessons/  サンプルレッスンの画像
-tools/           PowerPoint → AI-ALT 変換（スライドを変換.command / pptx2aialt.py）
+tools/           PowerPoint → AI-ALT 変換（変換係 aialt_helper.py とインストール用 .command / pptx2aialt.py / スライドを変換.command）
 ```

@@ -1,3 +1,4 @@
 .DS_Store
 *.aialt-slides.json
 __pycache__/
+tools/_work/

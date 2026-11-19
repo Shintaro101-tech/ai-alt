@@ -377,3 +377,10 @@ dialog h2 { margin: 0 0 8px; }
 /* slides made in AI-ALT keep a 16:10 shape on any screen (phones, tablets, projectors) */
 .slide-frame { position: absolute; inset: 0; display: grid; place-items: center; }
 .slide-box { container-type: size; width: min(100cqw, 160cqh); aspect-ratio: 16 / 10; }
+
+/* editor: drop a PowerPoint anywhere; converting */
+#app.drop-on { outline: 4px dashed var(--navy-2); outline-offset: -10px; background: var(--sun-soft); }
+#app.drop-on::after { content: '📥 ここにドロップして読み込む'; position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); background: var(--navy); color: #fff; font-weight: 800; padding: 16px 26px; border-radius: 16px; box-shadow: var(--shadow); pointer-events: none; z-index: 50; }
+.progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 10px 0; }
+.progress span { display: block; height: 100%; width: 35%; border-radius: 99px; background: var(--navy-2); animation: indet 1.4s ease-in-out infinite; }
+@keyframes indet { from { transform: translateX(-100%); } to { transform: translateX(290%); } }

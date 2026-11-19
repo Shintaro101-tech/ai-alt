@@ -1,6 +1,7 @@
 // Lesson editor: the ALT, the lesson plan the ALT follows, and the slides on the display.
 // Slides are either made here (text and a picture) or imported from PowerPoint
-// (converted with tools/スライドを変換.command). Changes are saved automatically.
+// (a .pptx is converted by the helper on this Mac — tools/aialt_helper.py — or by hand with
+// tools/スライドを変換.command). Changes are saved automatically.
 
 import { ALTS, avatarHTML, altKey } from './avatars.js';
 import { LEVELS, LEVEL_KEYS, levelKey } from './levels.js';
@@ -104,7 +105,7 @@ export async function renderEditor(el, id) {
           <input type="file" id="pptFile" accept=".json,.pptx,application/json,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
         </div>
       </div>
-      <p class="mini muted">PowerPoint は、先に <b>AI-ALT/tools/スライドを変換.command</b> で変換し、できた <b>○○.aialt-slides.json</b> を読み込みます（アニメーションも再現されます）。</p>
+      <p class="mini muted">PowerPoint（.pptx）を選ぶか、この画面にドラッグすると、自動で変換して読み込みます（アニメーションも再現。このMacに「変換係」が必要です）。</p>
       <div id="slides">${lesson.slides.map(slideHTML).join('')}</div>
       <button class="btn btn-ghost add-slide" id="add">＋ スライドを追加（文字・画像）</button>`;
 
@@ -167,18 +168,8 @@ export async function renderEditor(el, id) {
     if (!file) return;
     $('#pptFile', el).value = '';
     if (/\.(pptx?|key)$/i.test(file.name)) {
-      openDialog(`
-        <form class="form">
-          <h2>📥 PowerPoint を変換してください</h2>
-          <p>ブラウザでは PowerPoint をそのまま再生できないため、先に変換が必要です（1回だけ）。</p>
-          <ol class="steps-list">
-            <li>Finder で <b>名桜大学公募 › AI-ALT › tools</b> を開く</li>
-            <li><b>スライドを変換.command</b> をダブルクリックし、<b>${esc(file.name)}</b> を選ぶ</li>
-            <li>同じフォルダにできた <b>${esc(file.name.replace(/\.[^.]+$/, ''))}.aialt-slides.json</b> を、もう一度「📥 PowerPoint を読み込む」で選ぶ</li>
-          </ol>
-          <p class="mini muted">初回に「開発元が未確認」と出たら、右クリック →「開く」。PowerPoint のファイルアクセスを聞かれたら「許可」。</p>
-          <div class="actions"><button class="btn btn-primary">OK</button></div>
-        </form>`);
+      const raw = await convertWithHelper(file);
+      if (raw) await addDeck(raw);
       return;
     }
     let raw;
@@ -189,9 +180,13 @@ export async function renderEditor(el, id) {
       return;
     }
     if (raw?.kind !== 'slides' || !Array.isArray(raw.slides)) {
-      toast('変換したスライドのファイル（.aialt-slides.json）を選んでください', 'error');
+      toast('PowerPoint（.pptx）か、変換したスライドのファイル（.aialt-slides.json）を選んでください', 'error');
       return;
     }
+    await addDeck(raw);
+  }
+
+  async function addDeck(raw) {
     const slides = raw.slides.map((s) => ({
       id: uid(),
       title: s.title || `Slide ${s.number}`,
@@ -226,8 +221,105 @@ export async function renderEditor(el, id) {
     toast(`${slides.length}枚のスライドを読み込みました`, 'success');
   }
 
+  // Drop a PowerPoint (or a converted file) anywhere on the editor.
+  const drop = new AbortController();
+  const on = { signal: drop.signal };
+  const isFileDrag = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+  el.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e) || e.target.closest('.slide-edit')) return;
+    e.preventDefault();
+    el.classList.add('drop-on');
+  }, on);
+  el.addEventListener('dragleave', (e) => { if (e.target === el || !el.contains(e.relatedTarget)) el.classList.remove('drop-on'); }, on);
+  el.addEventListener('drop', (e) => {
+    el.classList.remove('drop-on');
+    if (!isFileDrag(e) || e.target.closest('.slide-edit')) return;
+    e.preventDefault();
+    const file = [...e.dataTransfer.files].find((f) => /\.(pptx?|key|json)$/i.test(f.name));
+    if (file) importDeck(file);
+    else toast('PowerPoint（.pptx）をドロップしてください', 'error');
+  }, on);
+
   draw();
-  return () => clearTimeout(timer);
+  return () => { clearTimeout(timer); drop.abort(); el.classList.remove('drop-on'); };
+}
+
+// ------------------------------------------------------------------ PowerPoint via the helper on this Mac
+
+const HELPER = 'http://127.0.0.1:8766';
+
+async function helperAlive() {
+  try {
+    const res = await fetch(`${HELPER}/ping`, { signal: AbortSignal.timeout(2500) });
+    return (await res.json()).ok === true;
+  } catch {
+    return false;
+  }
+}
+
+// Sends the .pptx to the helper and returns the converted deck, or null.
+async function convertWithHelper(file) {
+  if (/\.key$/i.test(file.name)) {
+    toast('Keynote は、PowerPoint 形式（.pptx）で書き出してから選んでください', 'error');
+    return null;
+  }
+  if (/\.ppt$/i.test(file.name)) {
+    toast('古い形式（.ppt）です。PowerPoint で .pptx として保存し直してから選んでください', 'error');
+    return null;
+  }
+  if (!(await helperAlive())) {
+    helperMissing(file);
+    return null;
+  }
+  const started = Date.now();
+  const dlg = openDialog(`
+    <form class="form converting">
+      <h2>📥 変換しています…</h2>
+      <p><b>${esc(file.name)}</b></p>
+      <div class="progress"><span></span></div>
+      <p class="mini muted">PowerPoint が開いて、クリックごとの画面を作ります（自動で閉じます）。スライドが多いと1〜2分かかります。<br>
+      Mac から「PowerPoint を操作する」などの許可を求められたら「OK／許可」を選んでください。</p>
+      <p class="mini muted" id="elapsed"></p>
+    </form>`);
+  const noCancel = (e) => e.preventDefault();
+  dlg.addEventListener('cancel', noCancel);
+  const tick = setInterval(() => {
+    const t = $('#elapsed', dlg);
+    if (t) t.textContent = `${Math.round((Date.now() - started) / 1000)} 秒`;
+  }, 1000);
+  try {
+    const res = await fetch(`${HELPER}/convert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+      body: file,
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) throw new Error(j.error || `変換できませんでした (${res.status})`);
+    return j.deck;
+  } catch (err) {
+    toast(err.message === 'Failed to fetch' ? '変換係との接続が切れました。もう一度試してください。' : err.message, 'error');
+    return null;
+  } finally {
+    clearInterval(tick);
+    dlg.removeEventListener('cancel', noCancel);
+    dlg.close();
+  }
+}
+
+function helperMissing(file) {
+  openDialog(`
+    <form class="form">
+      <h2>📥 変換係が見つかりません</h2>
+      <p>PowerPoint を自動で変換するには、このMacに「変換係」が必要です（最初の1回だけ）。</p>
+      <ol class="steps-list">
+        <li>Finder で <b>名桜大学公募 › AI-ALT › tools</b> を開く</li>
+        <li><b>変換係をインストール.command</b> をダブルクリック（「開発元が未確認」と出たら、右クリック →「開く」）</li>
+        <li>「インストールしました」と出たら、もう一度 <b>${esc(file.name)}</b> を選ぶ</li>
+      </ol>
+      <p class="mini muted">インストール済みなのにこの画面が出るときは、Chrome で開いてください。ブラウザに「ローカルネットワーク上のデバイスへのアクセス」を聞かれたら「許可」を選びます。<br>
+      変換係を使わない場合は、<b>スライドを変換.command</b> で変換し、できた <b>.aialt-slides.json</b> を選んでも読み込めます。</p>
+      <div class="actions"><button class="btn btn-primary">OK</button></div>
+    </form>`);
 }
 
 // One made-here slide as it appears on the display (also used by the classroom).
