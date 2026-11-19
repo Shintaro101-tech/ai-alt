@@ -349,17 +349,21 @@ async function convertViaBridge(file) {
   let onMsg = null;
   let timer = 0;
   let closedCheck = 0;
+  let hello = 0;
   try {
     return await new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('missing')), 8000);
+      timer = setTimeout(() => reject(new Error('missing')), 10000);
+      // Call the window until it answers (Safari doesn't let it reach us first).
+      hello = setInterval(() => { try { win.postMessage({ type: 'aialt-hello' }, HELPER); } catch {} }, 300);
       closedCheck = setInterval(() => {
         if (win.closed) reject(new Error('変換係のウィンドウが閉じられました。もう一度試してください。'));
       }, 1000);
       onMsg = (e) => {
-        if (e.origin !== HELPER || e.source !== win) return;
+        if (e.origin !== HELPER) return;
         if (e.data?.type === 'aialt-ready' && !ready) {
           ready = true;
           clearTimeout(timer);
+          clearInterval(hello);
           win.postMessage({ type: 'aialt-convert', name: file.name, buf }, HELPER, [buf]);
         } else if (e.data?.type === 'aialt-result') {
           if (e.data.ok) resolve(e.data.deck);
@@ -380,6 +384,7 @@ async function convertViaBridge(file) {
   } finally {
     clearTimeout(timer);
     clearInterval(closedCheck);
+    clearInterval(hello);
     window.removeEventListener('message', onMsg);
     done();
   }

@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 HOST, PORT = '127.0.0.1', 8766
-VERSION = 2
+VERSION = 3
 MAX_BYTES = 400 * 1024 * 1024
 ALLOWED_ORIGINS = {
     'https://shintaro101-tech.github.io',
@@ -56,8 +56,12 @@ p { margin: 6px 0; font-size: .9rem; }
 const ALLOWED = __ALLOWED__;
 const msg = document.getElementById('msg');
 let busy = false;
+let heard = false;
 window.addEventListener('message', async (e) => {
-  if (!ALLOWED.includes(e.origin) || !e.data || e.data.type !== 'aialt-convert' || busy) return;
+  if (!ALLOWED.includes(e.origin) || !e.data) return;
+  // Safari cuts window.opener for this window, so the AI-ALT page calls first and we answer.
+  if (e.data.type === 'aialt-hello') { heard = true; e.source.postMessage({ type: 'aialt-ready' }, e.origin); return; }
+  if (e.data.type !== 'aialt-convert' || busy) return;
   busy = true;
   const reply = (data) => e.source.postMessage({ type: 'aialt-result', ...data }, e.origin);
   msg.textContent = `変換しています：${e.data.name}`;
@@ -76,9 +80,13 @@ window.addEventListener('message', async (e) => {
     msg.textContent = '変換係に接続できませんでした。'; msg.className = 'err';
   }
 });
-// Tell the AI-ALT page that this window is ready.
+// Tell the AI-ALT page that this window is ready (where the browser keeps window.opener).
 if (window.opener) for (const o of ALLOWED) { try { window.opener.postMessage({ type: 'aialt-ready' }, o); } catch (_) {} }
-else { msg.textContent = 'このウィンドウは AI-ALT から自動で開きます。閉じて構いません。'; document.getElementById('bar').remove(); }
+setTimeout(() => {
+  if (heard || busy) return;
+  msg.textContent = 'AI-ALT からの連絡がありません。このウィンドウを閉じて、AI-ALT でもう一度試してください。';
+  document.getElementById('bar').remove();
+}, 15000);
 </script>
 </body></html>
 '''.replace('__ALLOWED__', json.dumps(sorted(ALLOWED_ORIGINS)))
