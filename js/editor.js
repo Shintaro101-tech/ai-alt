@@ -267,10 +267,13 @@ async function convertWithHelper(file) {
     toast('古い形式（.ppt）です。PowerPoint で .pptx として保存し直してから選んでください', 'error');
     return null;
   }
-  if (!(await helperAlive())) {
-    helperMissing(file);
-    return null;
-  }
+  // Chrome can call the helper directly. Safari blocks https pages from calling
+  // http://127.0.0.1, so there the helper's own small window does the sending.
+  if (await helperAlive()) return convertDirect(file);
+  return convertViaBridge(file);
+}
+
+function progressDialog(file, note) {
   const started = Date.now();
   const dlg = openDialog(`
     <form class="form converting">
@@ -278,7 +281,7 @@ async function convertWithHelper(file) {
       <p><b>${esc(file.name)}</b></p>
       <div class="progress"><span></span></div>
       <p class="mini muted">PowerPoint が開いて、クリックごとの画面を作ります（自動で閉じます）。スライドが多いと1〜2分かかります。<br>
-      Mac から「PowerPoint を操作する」などの許可を求められたら「OK／許可」を選んでください。</p>
+      Mac から「PowerPoint を操作する」などの許可を求められたら「OK／許可」を選んでください。${note ? `<br>${note}` : ''}</p>
       <p class="mini muted" id="elapsed"></p>
     </form>`);
   const noCancel = (e) => e.preventDefault();
@@ -287,6 +290,18 @@ async function convertWithHelper(file) {
     const t = $('#elapsed', dlg);
     if (t) t.textContent = `${Math.round((Date.now() - started) / 1000)} 秒`;
   }, 1000);
+  let closed = false;
+  return () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(tick);
+    dlg.removeEventListener('cancel', noCancel);
+    dlg.close();
+  };
+}
+
+async function convertDirect(file) {
+  const done = progressDialog(file);
   try {
     const res = await fetch(`${HELPER}/convert`, {
       method: 'POST',
@@ -300,9 +315,73 @@ async function convertWithHelper(file) {
     toast(err.message === 'Failed to fetch' ? '変換係との接続が切れました。もう一度試してください。' : err.message, 'error');
     return null;
   } finally {
-    clearInterval(tick);
-    dlg.removeEventListener('cancel', noCancel);
-    dlg.close();
+    done();
+  }
+}
+
+// Opens the helper's window (needs a click, or the browser blocks the pop-up), hands it the file
+// with postMessage, and waits for the converted deck.
+async function convertViaBridge(file) {
+  const go = await new Promise((resolve) => {
+    let ok = false;
+    const dlg = openDialog(`
+      <form class="form">
+        <h2>📥 PowerPoint を変換します</h2>
+        <p><b>${esc(file.name)}</b></p>
+        <p class="mini muted">「変換を始める」を押すと、変換係の小さなウィンドウが開いて変換します（終わると自動で閉じます）。</p>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" data-close>キャンセル</button>
+          <button class="btn btn-primary">▶ 変換を始める</button>
+        </div>
+      </form>`, { onSubmit: () => { ok = true; } });
+    dlg.addEventListener('close', () => resolve(ok), { once: true });
+  });
+  if (!go) return null;
+  // Opened right after the click (still counts as the user's action).
+  const win = window.open(`${HELPER}/bridge`, 'aialt-helper', 'popup,width=440,height=300');
+  if (!win) {
+    toast('ポップアップがブロックされました。Safari の設定で、このサイトのポップアップを許可してください。', 'error');
+    return null;
+  }
+  const buf = await file.arrayBuffer();
+  const done = progressDialog(file, '変換係のウィンドウは閉じずにそのままにしてください。');
+  let ready = false;
+  let onMsg = null;
+  let timer = 0;
+  let closedCheck = 0;
+  try {
+    return await new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error('missing')), 8000);
+      closedCheck = setInterval(() => {
+        if (win.closed) reject(new Error('変換係のウィンドウが閉じられました。もう一度試してください。'));
+      }, 1000);
+      onMsg = (e) => {
+        if (e.origin !== HELPER || e.source !== win) return;
+        if (e.data?.type === 'aialt-ready' && !ready) {
+          ready = true;
+          clearTimeout(timer);
+          win.postMessage({ type: 'aialt-convert', name: file.name, buf }, HELPER, [buf]);
+        } else if (e.data?.type === 'aialt-result') {
+          if (e.data.ok) resolve(e.data.deck);
+          else reject(new Error(e.data.error || '変換できませんでした'));
+        }
+      };
+      window.addEventListener('message', onMsg);
+    });
+  } catch (err) {
+    if (err.message === 'missing') {
+      try { win.close(); } catch {}
+      done();
+      helperMissing(file);
+    } else {
+      toast(err.message, 'error');
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
+    clearInterval(closedCheck);
+    window.removeEventListener('message', onMsg);
+    done();
   }
 }
 

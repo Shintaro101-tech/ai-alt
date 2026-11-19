@@ -419,16 +419,33 @@ def build_expanded(src_zip, plan, out_path):
 
 def powerpoint_pdf(pptx_path, pdf_path):
     script = f'''
-tell application "Microsoft PowerPoint"
-  open POSIX file "{pptx_path}"
-  delay 2
-  set p to active presentation
-  save p in POSIX file "{pdf_path}" as save as PDF
-  close p saving no
-end tell'''
+with timeout of 300 seconds
+  tell application "Microsoft PowerPoint"
+    open POSIX file "{pptx_path}"
+    delay 2
+    set p to active presentation
+    save p in POSIX file "{pdf_path}" as save as PDF
+    close p saving no
+  end tell
+end timeout'''
     r = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(pdf_path):
-        raise SystemExit(f'PowerPoint でPDFにできませんでした: {r.stderr.strip()}')
+        close_presentation(pptx_path)
+        raise SystemExit(f'PowerPoint でPDFにできませんでした。PowerPoint に確認の画面が出ていないか見てください。（{r.stderr.strip()}）')
+
+
+def close_presentation(pptx_path):
+    """After a failure, closes our working copy if PowerPoint still has it open."""
+    name = os.path.basename(pptx_path)
+    script = f'''
+with timeout of 20 seconds
+  tell application "Microsoft PowerPoint"
+    repeat with p in (every presentation whose name is "{name}")
+      close p saving no
+    end repeat
+  end tell
+end timeout'''
+    subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
 
 
 # ---------------------------------------------------------------- main

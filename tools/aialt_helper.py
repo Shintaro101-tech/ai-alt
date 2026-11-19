@@ -23,13 +23,65 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 HOST, PORT = '127.0.0.1', 8766
-VERSION = 1
+VERSION = 2
 MAX_BYTES = 400 * 1024 * 1024
 ALLOWED_ORIGINS = {
     'https://shintaro101-tech.github.io',
     'http://localhost:8765',
     'http://127.0.0.1:8765',
 }
+# The helper's own bridge page (used by Safari, which blocks https pages from calling http://127.0.0.1).
+SELF_ORIGIN = f'http://127.0.0.1:{PORT}'
+
+BRIDGE_HTML = '''<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>AI-ALT 変換係</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; font-family: 'Hiragino Sans', system-ui, sans-serif; background: #F3F6FB; color: #13233A; display: grid; place-items: center; min-height: 100vh; }
+main { text-align: center; padding: 24px; }
+h1 { font-size: 1.1rem; color: #123A6B; margin: 0 0 10px; }
+p { margin: 6px 0; font-size: .9rem; }
+.bar { width: 260px; height: 8px; border-radius: 99px; background: #DDE6F2; overflow: hidden; margin: 14px auto; }
+.bar span { display: block; height: 100%; width: 35%; background: #1E5AA0; border-radius: 99px; animation: m 1.4s ease-in-out infinite; }
+@keyframes m { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.err { color: #B42318; font-weight: 700; }
+</style></head>
+<body><main>
+<h1>📥 AI-ALT 変換係</h1>
+<p id="msg">AI-ALT からファイルを受け取っています…</p>
+<div class="bar" id="bar"><span></span></div>
+<p id="sub" style="color:#63718A;font-size:.8rem">変換が終わると、このウィンドウは自動で閉じます。</p>
+</main>
+<script>
+const ALLOWED = __ALLOWED__;
+const msg = document.getElementById('msg');
+let busy = false;
+window.addEventListener('message', async (e) => {
+  if (!ALLOWED.includes(e.origin) || !e.data || e.data.type !== 'aialt-convert' || busy) return;
+  busy = true;
+  const reply = (data) => e.source.postMessage({ type: 'aialt-result', ...data }, e.origin);
+  msg.textContent = `変換しています：${e.data.name}`;
+  const t0 = Date.now();
+  const tick = setInterval(() => { document.getElementById('sub').textContent = `${Math.round((Date.now() - t0) / 1000)} 秒（PowerPoint が開いて閉じます）`; }, 1000);
+  try {
+    const res = await fetch('/convert', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(e.data.name) }, body: e.data.buf });
+    const j = await res.json().catch(() => ({ ok: false, error: `変換できませんでした (${res.status})` }));
+    reply(j);
+    clearInterval(tick);
+    if (j.ok) { msg.textContent = '完了しました。'; setTimeout(() => window.close(), 300); }
+    else { msg.textContent = j.error || '変換できませんでした。'; msg.className = 'err'; document.getElementById('bar').remove(); }
+  } catch (err) {
+    clearInterval(tick);
+    reply({ ok: false, error: '変換係に接続できませんでした。' });
+    msg.textContent = '変換係に接続できませんでした。'; msg.className = 'err';
+  }
+});
+// Tell the AI-ALT page that this window is ready.
+if (window.opener) for (const o of ALLOWED) { try { window.opener.postMessage({ type: 'aialt-ready' }, o); } catch (_) {} }
+else { msg.textContent = 'このウィンドウは AI-ALT から自動で開きます。閉じて構いません。'; document.getElementById('bar').remove(); }
+</script>
+</body></html>
+'''.replace('__ALLOWED__', json.dumps(sorted(ALLOWED_ORIGINS)))
 # PowerPoint is sandboxed: it reads and writes in a fixed folder that it is allowed to use.
 WORK = os.path.join(HERE, '_work')
 
@@ -47,7 +99,7 @@ class Handler(BaseHTTPRequestHandler):
         log(self.address_string(), fmt % args)
 
     def origin_ok(self):
-        return self.headers.get('Origin') in ALLOWED_ORIGINS
+        return self.headers.get('Origin') in ALLOWED_ORIGINS or self.headers.get('Origin') == SELF_ORIGIN
 
     def cors(self):
         origin = self.headers.get('Origin')
@@ -75,6 +127,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self.path.split('?')[0] == '/bridge':
+            body = BRIDGE_HTML.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.split('?')[0] == '/ping':
             return self.reply(200, {'ok': True, 'app': 'AI-ALT helper', 'version': VERSION, 'busy': lock.locked()})
         self.reply(404, {'ok': False, 'error': 'not found'})
@@ -107,20 +168,25 @@ class Handler(BaseHTTPRequestHandler):
 def convert_bytes(name, data):
     from pptx2aialt import convert  # imported here so that /ping works even if python-pptx is missing
 
+    # Always the same folder (no new sub-folders), so PowerPoint asks for file access only once.
     os.makedirs(WORK, exist_ok=True)
-    job = tempfile.mkdtemp(prefix='job_', dir=WORK)
+    stem = f'job_{os.getpid()}_{int(time.time() * 1000)}'
+    src = os.path.join(WORK, f'{stem}.pptx')
+    out_dir = tempfile.mkdtemp(prefix='aialt_out_')
     try:
-        src = os.path.join(job, name)
         with open(src, 'wb') as f:
             f.write(data)
-        out = os.path.join(job, 'out.aialt-slides.json')
+        out = os.path.join(out_dir, 'out.aialt-slides.json')
         started = time.time()
         log(f'変換開始: {name}（{len(data) // 1024} KB）')
         result = convert(src, out)
+        result['name'] = os.path.splitext(name)[0]
         log(f'変換終了: {name}（{time.time() - started:.1f} 秒）')
         return {'ok': True, 'deck': result}
     finally:
-        shutil.rmtree(job, ignore_errors=True)
+        if os.path.exists(src):
+            os.remove(src)
+        shutil.rmtree(out_dir, ignore_errors=True)
 
 
 def main():
