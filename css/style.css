@@ -384,3 +384,10 @@ dialog h2 { margin: 0 0 8px; }
 .progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 10px 0; }
 .progress span { display: block; height: 100%; width: 35%; border-radius: 99px; background: var(--navy-2); animation: indet 1.4s ease-in-out infinite; }
 @keyframes indet { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+
+/* sounds */
+.tag.snd { background: #E4F0FF; color: var(--navy-2); }
+.snd-stop { margin-left: 6px; }
+.display-nav { position: relative; }
+.display-nav .snd-stop { position: absolute; right: 0; top: 50%; transform: translateY(-30%); margin: 0; }
+@media (max-width: 860px) { .display-nav .snd-stop { position: static; transform: none; } }

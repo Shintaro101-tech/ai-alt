@@ -174,7 +174,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def convert_bytes(name, data):
-    from pptx2aialt import convert  # imported here so that /ping works even if python-pptx is missing
+    # Loaded fresh every time, so an updated converter is used without restarting the helper.
+    import importlib
+    import pptx2aialt
+    convert = importlib.reload(pptx2aialt).convert
 
     # Always the same folder (no new sub-folders), so PowerPoint asks for file access only once.
     os.makedirs(WORK, exist_ok=True)

@@ -38,7 +38,7 @@ export async function renderEditor(el, id) {
   const deckHTML = (s, i) => `
     <article class="slide-edit deck" data-i="${i}">
       <div class="slide-edit-head">
-        <b>スライド ${i + 1} <span class="tag">PowerPoint${s.deck.steps.length > 1 ? ` ・ クリック ${s.deck.steps.length - 1} 回` : ''}</span></b>
+        <b>スライド ${i + 1} <span class="tag">PowerPoint${s.deck.steps.length > 1 ? ` ・ クリック ${s.deck.steps.length - 1} 回` : ''}</span>${soundTag(s)}</b>
         ${tools(i)}
       </div>
       <div class="slide-edit-grid">
@@ -193,7 +193,7 @@ export async function renderEditor(el, id) {
       body: '',
       image: '',
       note: s.notes || '',
-      deck: { steps: s.steps, clicks: s.clicks || [], transition: Boolean(s.transition), text: s.text || '', aspect: raw.aspect || 16 / 9 },
+      deck: { steps: s.steps, clicks: s.clicks || [], transition: Boolean(s.transition), text: s.text || '', aspect: raw.aspect || 16 / 9, sounds: s.sounds || [], transitionSound: s.transitionSound || null },
     }));
     const blank = lesson.slides.every((s) => !s.deck && !s.title && !s.body && !s.image);
     let mode = 'replace';
@@ -425,4 +425,13 @@ export function slideView(s) {
 export function levelButtons(cur) {
   const on = levelKey(cur);
   return LEVEL_KEYS.map((k) => `<button type="button" class="lv ${k === on ? 'on' : ''}" data-cefr="${k}" title="${LEVELS[k].ja}"><b>${k}</b><small>${LEVELS[k].ja}</small></button>`).join('');
+}
+
+function soundTag(s) {
+  const n = (s.deck.sounds || []).filter((x) => x.kind === 'sfx').length + (s.deck.transitionSound?.src ? 1 : 0);
+  const music = (s.deck.sounds || []).filter((x) => x.kind === 'track' && x.cmd === 'playFrom');
+  const parts = [];
+  if (n) parts.push(`効果音 ${n}`);
+  if (music.length) parts.push(`音楽 ${music.length}${music.some((m) => m.slides > 1) ? '（次のスライドへ続く）' : ''}`);
+  return parts.length ? `<span class="tag snd">♪ ${parts.join('・')}</span>` : '';
 }

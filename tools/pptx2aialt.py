@@ -112,7 +112,25 @@ def read_timing(slide_el):
                 'start': effect_start(ctn, par),
                 'dur': effect_duration(ctn),
             })
-        groups.append({'auto': auto, 'effects': effects})
+        sounds = []
+        for snd in par.iter(P + 'sndTgt'):
+            node = snd.getparent()
+            while node is not None and node.tag != P + 'cMediaNode':
+                node = node.getparent()
+            ctn = node.find('p:cTn', NS) if node is not None else None
+            sounds.append({'rid': snd.get(R + 'embed'), 'name': snd.get('name') or '',
+                           'start': effect_start(ctn, par) if ctn is not None else 0})
+        media = []
+        for cmd in par.iter(P + 'cmd'):
+            what = (cmd.get('cmd') or '').split('(')[0]
+            tgt = cmd.find('.//p:spTgt', NS)
+            if tgt is None or what not in ('playFrom', 'togglePause', 'stop'):
+                continue
+            ctn = cmd.find('p:cBhvr/p:cTn', NS)
+            m = re.match(r'playFrom\(([\d.]+)\)', cmd.get('cmd') or '')
+            media.append({'spid': tgt.get('spid'), 'cmd': what, 'from': float(m.group(1)) if m else 0.0,
+                          'start': effect_start(ctn, par) if ctn is not None else 0})
+        groups.append({'auto': auto, 'effects': effects, 'sounds': sounds, 'media': media})
     return groups
 
 
@@ -287,6 +305,140 @@ def slide_title(slide):
     return ''
 
 
+# ---------------------------------------------------------------- sounds and music
+
+AUDIO_MIME = {'.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.mp4': 'audio/mp4', '.aac': 'audio/aac',
+              '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg'}
+
+
+def slide_rels(z, part):
+    """rId -> zip path of the target (internal targets only)."""
+    try:
+        rels = etree.fromstring(z.read(rels_path(part)))
+    except KeyError:
+        return {}
+    out = {}
+    for rel in rels.findall('rel:Relationship', NS):
+        if rel.get('TargetMode') == 'External':
+            continue
+        out[rel.get('Id')] = resolve(part, rel.get('Target'))
+    return out
+
+
+_audio_cache = {}
+
+
+def audio_data_url(z, path):
+    """The sound as a data: URL a browser can play (other formats are converted with afconvert)."""
+    if path in _audio_cache:
+        return _audio_cache[path]
+    try:
+        data = z.read(path)
+    except KeyError:
+        return None
+    ext = os.path.splitext(path)[1].lower()
+    mime = AUDIO_MIME.get(ext)
+    if not mime:
+        tmp = tempfile.mkdtemp(prefix='aialt_snd_')
+        try:
+            src = os.path.join(tmp, 'in' + ext)
+            dst = os.path.join(tmp, 'out.m4a')
+            with open(src, 'wb') as f:
+                f.write(data)
+            r = subprocess.run(['afconvert', '-f', 'm4af', '-d', 'aac', src, dst], capture_output=True)
+            if r.returncode != 0 or not os.path.exists(dst):
+                log(f'  （この音声は再生できない形式のため省きます: {os.path.basename(path)}）')
+                _audio_cache[path] = None
+                return None
+            with open(dst, 'rb') as f:
+                data = f.read()
+            mime = 'audio/mp4'
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    url = f'data:{mime};base64,' + base64.b64encode(data).decode()
+    _audio_cache[path] = url
+    return url
+
+
+def media_shapes(slide_el, rels):
+    """spid -> zip path of the audio file for audio shapes on the slide (videos are skipped)."""
+    out = {}
+    for nv in slide_el.iter(P + 'nvPicPr', P + 'nvSpPr'):
+        cnv = nv.find('p:cNvPr', NS)
+        nvpr = nv.find('p:nvPr', NS)
+        if cnv is None or nvpr is None:
+            continue
+        audio = nvpr.find('a:audioFile', NS)
+        if audio is None:
+            continue
+        path = None
+        for el in nvpr.iter():
+            if el.tag.endswith('}media') and el.get(R + 'embed') in rels:
+                path = rels[el.get(R + 'embed')]
+        if path is None:
+            path = rels.get(audio.get(R + 'link'))
+        if path:
+            out[cnv.get('id')] = path
+    return out
+
+
+def media_settings(slide_el):
+    """spid -> {'vol', 'loop', 'slides'} from the slide's timing (p:audio / p:cMediaNode)."""
+    out = {}
+    for node in slide_el.iter(P + 'cMediaNode'):
+        tgt = node.find('p:tgtEl/p:spTgt', NS)
+        if tgt is None:
+            continue
+        ctn = node.find('p:cTn', NS)
+        out[tgt.get('spid')] = {
+            'vol': round(num(node.get('vol'), 100000) / 100000, 2),
+            'loop': ctn is not None and ctn.get('repeatCount') == 'indefinite',
+            'slides': max(1, num(node.get('numSld'), 1)),
+        }
+    return out
+
+
+def slide_sounds(z, part, slide_el, groups):
+    """Sounds of one slide: [{'at': click number (0 = when the slide appears), 'start': ms,
+    'kind': 'sfx'|'track', 'src': data URL, ...}] and the transition sound."""
+    rels = slide_rels(z, part)
+    shapes = media_shapes(slide_el, rels)
+    settings = media_settings(slide_el)
+    out = []
+    click = 0
+    seen_click = False
+    for g in groups:
+        if not g['auto']:
+            click += 1
+            seen_click = True
+        at = click if (seen_click or not g['auto']) else 0
+        for snd in g.get('sounds', []):
+            src = audio_data_url(z, rels.get(snd['rid'], '')) if snd['rid'] in rels else None
+            if src:
+                out.append({'at': at, 'start': snd['start'], 'kind': 'sfx', 'src': src, 'name': snd['name']})
+        for m in g.get('media', []):
+            path = shapes.get(m['spid'])
+            src = audio_data_url(z, path) if path else None
+            if not src:
+                continue
+            st = settings.get(m['spid'], {'vol': 1, 'loop': False, 'slides': 1})
+            out.append({'at': at, 'start': m['start'], 'kind': 'track', 'cmd': m['cmd'], 'from': m['from'],
+                        'id': f"{part}#{m['spid']}", 'src': src, 'vol': st['vol'], 'loop': st['loop'],
+                        'slides': st['slides'], 'name': os.path.basename(path)})
+    transition = None
+    tr = slide_el.find('.//p:transition', NS)
+    if tr is not None:
+        snd = tr.find('.//p:sndAc/p:stSnd/p:snd', NS)
+        if snd is not None and snd.get(R + 'embed') in rels:
+            src = audio_data_url(z, rels[snd.get(R + 'embed')])
+            if src:
+                st_snd = snd.getparent()
+                transition = {'src': src, 'loop': st_snd.get('loop') in ('1', 'true'), 'name': snd.get('name') or ''}
+        elif tr.find('.//p:sndAc/p:endSnd', NS) is not None:
+            transition = {'stop': True}
+    return out, transition
+
+
 def effect_for_browser(eff, boxes):
     box = boxes.get(eff['spid'])
     if not box:
@@ -452,6 +604,7 @@ end timeout'''
 
 def convert(src, out, width=1920, quality=88):
     src = os.path.abspath(src)
+    _audio_cache.clear()
     prs = Presentation(src)
     W, H = prs.slide_width, prs.slide_height
     z = zipfile.ZipFile(src)
@@ -464,7 +617,9 @@ def convert(src, out, width=1920, quality=88):
             continue  # skipped slides are not shown in a slide show
         xml = z.read(part)
         el = etree.fromstring(xml)
-        start, clicks = click_steps(read_timing(el))
+        groups = read_timing(el)
+        start, clicks = click_steps(groups)
+        sounds, tr_sound = slide_sounds(z, part, el, groups)
         states = visibility(start, clicks)
         plan.append((part, [make_state_xml(xml, sh, pa) for sh, pa in states]))
         boxes = shape_boxes(slide, W, H)
@@ -478,8 +633,10 @@ def convert(src, out, width=1920, quality=88):
             'notes': notes,
             'transition': el.find('.//p:transition', NS) is not None,
             'clicks': [[e for e in (effect_for_browser(f, boxes) for f in c) if e] for c in clicks],
+            'sounds': sounds,
+            'transitionSound': tr_sound,
         })
-        log(f'  スライド {i + 1}: クリック {len(clicks)} 回')
+        log(f'  スライド {i + 1}: クリック {len(clicks)} 回' + (f'・音 {len(sounds) + (1 if tr_sound and tr_sound.get("src") else 0)} 個' if sounds or tr_sound else ''))
 
     tmp = tempfile.mkdtemp(prefix='aialt_')
     # PowerPoint (sandboxed) reads and writes next to the original file.

@@ -8,6 +8,7 @@ import { ALTS, avatarHTML, altKey, createMeter } from './avatars.js';
 import { getLesson, saveLesson } from './store.js';
 import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.js';
 import { levelButtons } from './editor.js';
+import { SoundPlayer } from './sound.js';
 import { ensurePasscode } from './api.js';
 import { LiveSession } from './live.js';
 import { slideView } from './editor.js';
@@ -44,6 +45,7 @@ export async function renderClass(el, id) {
     pace: paceKey(lesson.pace), // the ALT's speaking speed
   };
   let live = null;
+  const sounds = new SoundPlayer(() => onSoundChange());
   let meter = null;
   let stage = null;
   let slideTimer = 0;
@@ -157,8 +159,8 @@ export async function renderClass(el, id) {
     $('#altName', el).innerHTML = `<b>${a.name}</b><span>${a.flag}</span>${pill}`;
     const ps = $('#pstatus', el);
     ps.innerHTML = state.status === 'live'
-      ? `<span class="dot-live ${state.muted ? 'off' : ''}"></span>${a.name} ${state.muted ? 'マイクOFF' : ''}`
-      : '';
+      ? `<span class="dot-live ${state.muted ? 'off' : ''}"></span>${a.name} ${state.muted ? 'マイクOFF' : ''}${sounds.playing ? ' ♪' : ''}`
+      : (sounds.playing ? '♪' : '');
   }
   function drawControls() {
     const c = $('#controls', el);
@@ -239,7 +241,9 @@ export async function renderClass(el, id) {
       <button class="nav-btn" id="prev" title="前へ（← / PageUp）">◀</button>
       <div class="dots">${lesson.slides.map((s, i) => `<button class="dot ${i === state.slide ? 'on' : ''}" data-go="${i}" title="${esc(s.title || `スライド ${i + 1}`)}">${i + 1}</button>`).join('')}</div>
       <button class="nav-btn" id="next" title="次へ（クリック / → / Space / PageDown）">▶</button>
-      ${n > 1 ? `<span class="steps">クリック ${state.step}/${n - 1}</span>` : ''}`;
+      ${n > 1 ? `<span class="steps">クリック ${state.step}/${n - 1}</span>` : ''}
+      <button class="btn btn-ghost btn-sm snd-stop ${sounds.playing ? '' : 'hide'}" id="sndStop" title="音を止める（S）">♪ 再生中 ⏹ 止める</button>`;
+    $('#sndStop', el).onclick = (e) => { e.stopPropagation(); sounds.stopAll(); };
     $('#prev', el).onclick = prev;
     $('#next', el).onclick = next;
     $$('[data-go]', el).forEach((b) => (b.onclick = () => goSlide(+b.dataset.go)));
@@ -282,6 +286,7 @@ export async function renderClass(el, id) {
     if (state.step < stepsOf(s) - 1) {
       const from = s.deck.steps[state.step];
       state.step++;
+      sounds.playAt(s, state.slide, state.step);
       if (stage) stage.play(from, s.deck.steps[state.step], s.deck.clicks[state.step - 1] || []);
       else drawDisplay();
       refreshChrome();
@@ -305,9 +310,15 @@ export async function renderClass(el, id) {
     state.blank = '';
     state.pop = false;
     state.tab = 'slides';
-    moveTo(i, step, false);
+    moveTo(i, step, false, true);
   }
-  function moveTo(i, step, forward) {
+  // forward: the next slide in order (plays its transition); enter: jumped to it (plays its sounds too).
+  function moveTo(i, step, forward, enter = false) {
+    sounds.arrive(i);
+    if ((forward || enter) && step === 0) {
+      sounds.transition(lesson.slides[i]);
+      sounds.playAt(lesson.slides[i], i, 0);
+    }
     const to = lesson.slides[i];
     const from = cur();
     // PowerPoint picture → PowerPoint picture: keep the stage and play the transition.
@@ -437,6 +448,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
           note(cue);
           drawAlt();
           drawControls();
+          onSoundChange();
           return;
         }
         if (st === 'lost') { toast('接続が切れました。もう一度呼んでください。', 'error'); stop(); }
@@ -483,8 +495,33 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     await s?.close().catch(() => {});
   }
 
+  // While music from a slide plays, the classroom microphone is turned off (the ALT would hear it).
+  function onSoundChange() {
+    $('#sndStop', el)?.classList.toggle('hide', !sounds.playing);
+    $('#pstatus', el) && drawName();
+    if (!live || state.status !== 'live') return;
+    if (sounds.playing && !state.muted) {
+      state.muted = true;
+      state.autoMuted = true;
+      live.setMuted(true);
+      drawName();
+      drawControls();
+      toast('音楽の再生中はマイクをOFFにします');
+    } else if (!sounds.playing && state.autoMuted) {
+      state.autoMuted = false;
+      if (state.muted) {
+        state.muted = false;
+        live.setMuted(false);
+        drawName();
+        drawControls();
+        toast('マイクをONに戻しました');
+      }
+    }
+  }
+
   function toggleMic() {
     if (!live) return;
+    state.autoMuted = false;
     state.muted = !state.muted;
     live.setMuted(state.muted);
     drawName();
@@ -603,6 +640,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     else if (['w', 'W', ','].includes(k)) { state.blank = state.blank === 'white' ? '' : 'white'; state.tab = 'slides'; drawDisplay(); }
     else if (k === 'Escape' && state.present) setPresent(false);
     else if (k === 'm' || k === 'M') toggleMic();
+    else if (k === 's' || k === 'S') sounds.stopAll();
     else if (k === 'a' || k === 'A') el.classList.toggle('show-alt');
     else if (k === 'q' || k === 'Q' || k === '/') {
       e.preventDefault();
@@ -623,6 +661,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     document.removeEventListener('fullscreenchange', onFull);
     window.removeEventListener('beforeunload', onLeave);
     clearTimeout(slideTimer);
+    sounds.stopAll();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (live) stop();
   };
