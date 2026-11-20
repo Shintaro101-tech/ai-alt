@@ -10,8 +10,8 @@ import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.
 import { levelButtons } from './editor.js';
 import { SoundPlayer } from './sound.js';
 import { openDeviceCheck } from './devices.js';
-import { VISUAL_KINDS, normalizeVisual, visualHTML, visualSummary, pictureHTML, findPicture } from './visuals.js';
-import { ensurePasscode } from './api.js';
+import { VISUAL_KINDS, normalizeVisual, normalizeSketch, visualHTML, visualSummary, pictureHTML, findPicture, illustrationHTML, animateDrawing } from './visuals.js';
+import { ensurePasscode, relayPost } from './api.js';
 import { LiveSession } from './live.js';
 import { slideView } from './editor.js';
 import { Stage, preload } from './deck.js';
@@ -140,7 +140,7 @@ export async function renderClass(el, id) {
 
   // ------------------------------------------------------------------ ALT panel
   function drawAlt() {
-    $('#altBox', el).innerHTML = avatarHTML(state.alt);
+    $('#altBox', el).innerHTML = `${avatarHTML(state.alt)}<div class="alt-drawing" aria-hidden="true"><span>✏️</span></div>`;
     drawName();
     const busy = state.status === 'live' || state.status === 'connecting';
     $('#pick', el).innerHTML = busy ? '' : Object.entries(ALTS).map(([k, x]) => `
@@ -234,6 +234,7 @@ export async function renderClass(el, id) {
       nav.innerHTML = `${pictures().length ? '<button class="btn btn-ghost btn-sm" id="picBtn">🖼 画像を出す</button>' : ''}${state.board.length ? '<button class="btn btn-ghost btn-sm" id="clear">ボードを消す</button>' : ''}`;
       $('#clear', el)?.addEventListener('click', () => { state.board = []; drawDisplay(); });
       $('#picBtn', el)?.addEventListener('click', pickPicture);
+      $$('[data-save-illu]', el).forEach((b) => (b.onclick = () => saveIllustration(b.dataset.saveIllu)));
     } else {
       screen.classList.remove('dark');
       screen.innerHTML = `<div class="script" id="script">${scriptHTML()}</div>`;
@@ -264,6 +265,10 @@ export async function renderClass(el, id) {
 
   function cardHTML(c, latest) {
     if (c.style === 'visual') return `<div class="card-b visual ${latest ? 'latest' : ''}">${c.heading ? `<h3>${esc(c.heading)}</h3>` : ''}${visualHTML(c.visual)}</div>`;
+    if (c.style === 'illustration') {
+      const save = c.status === 'done' && !c.saved ? `<button type="button" class="btn btn-ghost btn-sm illu-save" data-save-illu="${esc(c.id)}">📌 画像ライブラリに保存</button>` : '';
+      return `<div class="card-b picture ${latest ? 'latest' : ''}">${c.heading ? `<h3>${esc(c.heading)}</h3>` : ''}${illustrationHTML(c)}${save}</div>`;
+    }
     if (c.style === 'picture') return `<div class="card-b picture ${latest ? 'latest' : ''}">${c.heading ? `<h3>${esc(c.heading)}</h3>` : ''}${pictureHTML(pictures().find((p) => p.id === c.picture), c.caption)}</div>`;
     const items = c.items.map((it) => {
       if (c.style === 'vocabulary') return `<li><b>${esc(it.text)}</b>${it.note ? `<span>${esc(it.note)}</span>` : ''}</li>`;
@@ -416,6 +421,75 @@ export async function renderClass(el, id) {
     }
     state.unseen = false;
     drawDisplay();
+    // The new card is drawn line by line, and the ALT "draws" while it appears.
+    const ms = animateDrawing(newestCard());
+    if (ms > 0) drawing(ms);
+  }
+  const newestCard = () => $('.board-pop .card-b', el) || $('#screen .board .card-b.latest', el);
+
+  // The ALT holds a pen for a moment (or while an illustration is being made).
+  let drawTimer = 0;
+  function drawing(ms) {
+    const box = $('#altBox', el);
+    box.classList.add('drawing');
+    clearTimeout(drawTimer);
+    if (ms === Infinity) return;
+    drawTimer = setTimeout(() => {
+      if (!state.board.some((c) => c.status === 'pending')) box.classList.remove('drawing');
+    }, ms);
+  }
+  function showSketch(args) {
+    const visual = normalizeSketch(args);
+    if (!visual) return { ok: false, error: 'Nothing to draw. Give shapes on a 400 x 300 canvas.' };
+    putOnBoard({ heading: args.heading || '', style: 'visual', visual });
+    return { ok: true, shown: true };
+  }
+
+  // A detailed picture from the image AI (about 30 seconds). The ALT asks the teacher first;
+  // the picture appears on the board when it is ready, and the ALT is told.
+  function makeIllustration(args) {
+    const prompt = String(args.description || args.prompt || '').trim().slice(0, 800);
+    if (!prompt) return { ok: false, error: 'Describe the picture.' };
+    if (state.board.some((c) => c.status === 'pending')) return { ok: false, error: 'Another illustration is still being made. Wait for it first.' };
+    const card = { id: `illu_${Date.now()}`, heading: args.heading || '', style: 'illustration', status: 'pending', prompt, caption: String(args.caption || ''), started: Date.now() };
+    putOnBoard(card);
+    drawing(Infinity);
+    const tick = setInterval(() => {
+      $$('[data-since]', el).forEach((x) => (x.textContent = `${Math.round((Date.now() - Number(x.dataset.since)) / 1000)} 秒`));
+    }, 1000);
+    const finish = (patch) => {
+      clearInterval(tick);
+      Object.assign(card, patch);
+      $('#altBox', el)?.classList.remove('drawing');
+      const onTop = state.board[0] === card && (state.tab === 'board' || state.pop);
+      if (!onTop && card.status === 'done') state.unseen = state.tab !== 'board';
+      drawDisplay();
+      if (onTop) animateDrawing(newestCard());
+    };
+    relayPost('/illustrations', { prompt })
+      .then(async (res) => {
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.src) throw new Error(j.error?.message || `HTTP ${res.status}`);
+        finish({ status: 'done', src: j.src });
+        if (live) note(`[Display update — do not respond to this message] The illustration is now on your board: ${prompt}. You can tell the class it's ready and talk about it.`);
+      })
+      .catch((err) => {
+        finish({ status: 'error', error: err.message });
+        toast(`イラストを作れませんでした：${err.message}`, 'error');
+        if (live) note("[Teacher's private note — the class did not hear this; never read it aloud or mention it] The illustration could not be made. Apologise briefly and, if it helps, draw a quick sketch instead.");
+      });
+    return { ok: true, status: 'started', note: 'It will appear on the board in about 30 seconds. Tell the class it is coming; you can keep talking meanwhile.' };
+  }
+  // An illustration worth keeping goes into the lesson's picture library.
+  function saveIllustration(id) {
+    const card = state.board.find((c) => c.id === id);
+    if (!card?.src) return;
+    lesson.pictures = Array.isArray(lesson.pictures) ? lesson.pictures : [];
+    const name = (card.caption || card.prompt).replace(/[.。]$/, '').split(' ').slice(0, 6).join(' ');
+    lesson.pictures.push({ id: `pic_${Date.now()}`, name, note: card.prompt, src: card.src });
+    card.saved = true;
+    saveLesson(lesson).then(() => toast('画像ライブラリに保存しました（名前は編集画面で変えられます）')).catch((e) => toast(e.message, 'error'));
+    drawDisplay();
   }
   function showSlide(args) {
     const n = Math.round(Number(args.number));
@@ -459,6 +533,7 @@ export async function renderClass(el, id) {
       const shown = state.board.map((c) => `${c.heading ? `${c.heading}: ` : ''}${
         c.style === 'visual' ? visualSummary(c.visual)
         : c.style === 'picture' ? `picture "${pictures().find((p) => p.id === c.picture)?.name || ''}"`
+        : c.style === 'illustration' ? `illustration: ${c.prompt}`
         : c.items.map((i) => i.text).join(' | ')}`).join('\n');
       instructions += `\n\nRESUMED LESSON
 You were away for a moment and the teacher has called you back. Don't start over or introduce yourself again. The conversation so far:
@@ -476,7 +551,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
           type: 'responses',
           responses: {
             instructions: BACKEND_INSTRUCTIONS,
-            tools: [BOARD_TOOL, VISUAL_TOOL, ...(pictures().length ? [PICTURE_TOOL] : []), SLIDE_TOOL],
+            tools: [BOARD_TOOL, VISUAL_TOOL, SKETCH_TOOL, ILLUSTRATION_TOOL, ...(pictures().length ? [PICTURE_TOOL] : []), SLIDE_TOOL],
             tool_choice: 'auto',
             parallel_tool_calls: false,
           },
@@ -511,6 +586,8 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
         if (fn === 'show_on_board') return showOnBoard(args);
         if (fn === 'show_visual') return showVisual(args);
         if (fn === 'show_picture') return showPicture(args);
+        if (fn === 'draw_sketch') return showSketch(args);
+        if (fn === 'make_illustration') return makeIllustration(args);
         if (fn === 'show_slide') return showSlide(args);
         return { ok: false, error: 'unknown function' };
       },
@@ -783,7 +860,12 @@ You can change the display by delegating a request:
   * emoji picture cards — words with an emoji picture each (vocabulary, ideas).
 ${pics.length ? `- to show one of the teacher's pictures on your board (use the exact name):
 ${pics.map((p) => `  * "${p.name}"${p.note ? ` — ${p.note.replace(/\s*\n+\s*/g, ' ')}` : ''}`).join('\n')}
-` : ''}IMPORTANT: the display only changes when you delegate. Whenever you say you'll write, draw or show something, delegate it in the same turn with the full content — never just say it. Keep board text short. Don't draw more than the moment needs: one clear diagram is better than several. You can say "I've put it on the board."`;
+` : ''}- to SKETCH a simple picture on your board yourself, like a teacher drawing on a whiteboard: a house, a kitchen, a car, the weather, a stick figure, a map. It appears in a few seconds. Say what to draw and which words to label. Use it whenever a quick picture helps the class understand.
+- to make a detailed AI ILLUSTRATION (a real, colourful picture). It takes about 30 seconds, so it is NOT your first choice:
+  * Prefer a quick sketch, a diagram or one of the teacher's pictures.
+  * Only when someone asks for a detailed or realistic picture, or a sketch really isn't enough, ASK FIRST: "It might take about 30 seconds. Do you want me to do it?" Then wait.
+  * Delegate the illustration ONLY after the teacher clearly says yes, and describe the picture in detail. While it is being made, tell the class it's coming and keep the lesson going; you will be told when it is on the board.
+IMPORTANT: the display only changes when you delegate. Whenever you say you'll write, draw or show something, delegate it in the same turn with the full content — never just say it. Keep board text short. Don't draw more than the moment needs: one clear diagram is better than several. You can say "I've put it on the board."`;
 }
 
 const BACKEND_INSTRUCTIONS = `You are the backend helper for AI-ALT, an AI assistant language teacher used in English classes in Japan. The voice ALT delegates display tasks to you. You have these functions:
@@ -804,6 +886,15 @@ show_visual — draw a diagram or chart on the board. Pick the kind that fits an
   heading is optional and short; caption is an optional one-line explanation. Keep every label short (a few words).
 
 show_picture — show one of the teacher's pictures by its exact name.
+
+draw_sketch — draw a simple line picture yourself, like a teacher on a whiteboard (fast). Canvas: 400 wide x 300 high, (0,0) top left. Use 5–40 shapes:
+  - {type:"line", x1,y1,x2,y2} · {type:"rect", x,y,w,h, rx} · {type:"circle", cx,cy,r} · {type:"ellipse", cx,cy,rx,ry}
+  - {type:"polyline"|"polygon", points:[[x,y],...]} · {type:"path", d:"M ... C ... Z"} (plain SVG path commands only)
+  - {type:"text", x,y, text, size} for short English labels (centred on x,y).
+  Every shape may have color (black, navy, blue, red, orange, yellow, green, brown, pink, purple, gray, skyblue, white, or #hex), fill (a colour, or leave it out for none) and width (line thickness 2–8, default 4).
+  Draw the main outlines first, then details, then labels. Keep it simple, clear and friendly, filling most of the canvas; leave room for the labels. Add a short caption if it helps.
+
+make_illustration — a detailed AI illustration (takes about 30 seconds). Call it ONLY when the ALT's request says the teacher agreed to wait for it. description: a detailed English description of the picture (subject, setting, people, mood). Never ask for words or letters in the picture. caption: a short label.
 
 show_slide — show one of the teacher's slides (1-based number).
 
@@ -871,6 +962,54 @@ const VISUAL_TOOL = {
       },
     },
     required: ['kind'],
+  },
+};
+
+const SHAPE = {
+  type: 'object',
+  properties: {
+    type: { type: 'string', enum: ['line', 'rect', 'circle', 'ellipse', 'polyline', 'polygon', 'path', 'text'] },
+    x1: { type: 'number' }, y1: { type: 'number' }, x2: { type: 'number' }, y2: { type: 'number' },
+    x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, h: { type: 'number' },
+    cx: { type: 'number' }, cy: { type: 'number' }, r: { type: 'number' }, rx: { type: 'number' }, ry: { type: 'number' },
+    points: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+    d: { type: 'string', description: 'SVG path data (path only).' },
+    text: { type: 'string', description: 'Label (text only).' },
+    size: { type: 'number', description: 'Font size (text only).' },
+    color: { type: 'string' },
+    fill: { type: 'string' },
+    width: { type: 'number', description: 'Line thickness.' },
+  },
+  required: ['type'],
+};
+
+const SKETCH_TOOL = {
+  type: 'function',
+  name: 'draw_sketch',
+  description: "Draw a simple line picture on the ALT's board, like a teacher on a whiteboard (appears in a few seconds). Canvas 400 x 300.",
+  parameters: {
+    type: 'object',
+    properties: {
+      heading: { type: 'string', description: 'Optional short heading.' },
+      caption: { type: 'string', description: 'Optional one-line caption.' },
+      shapes: { type: 'array', items: SHAPE, description: 'Shapes in drawing order.' },
+    },
+    required: ['shapes'],
+  },
+};
+
+const ILLUSTRATION_TOOL = {
+  type: 'function',
+  name: 'make_illustration',
+  description: 'Make a detailed AI illustration for the board (about 30 seconds). Only after the teacher agreed to wait.',
+  parameters: {
+    type: 'object',
+    properties: {
+      description: { type: 'string', description: 'Detailed English description of the picture. No words or letters in the picture.' },
+      caption: { type: 'string', description: 'Short label shown under the picture.' },
+      heading: { type: 'string', description: 'Optional short heading.' },
+    },
+    required: ['description'],
   },
 };
 

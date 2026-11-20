@@ -458,3 +458,23 @@ dialog:has(.devcheck) { width: min(520px, 94vw); }
 .pic-menu { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .pic-menu button { display: flex; align-items: center; gap: 6px; }
 .pic-menu img { width: 34px; height: 26px; object-fit: cover; border-radius: 4px; }
+
+/* the ALT draws: a pen moves over the avatar while a drawing appears on the board */
+.alt-stage { position: relative; }
+.alt-drawing { position: absolute; right: 6%; bottom: 8%; font-size: clamp(22px, 3vw, 40px); opacity: 0; transform: scale(.6); transition: opacity .25s, transform .25s; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .3)); }
+.alt-stage.drawing .alt-drawing { opacity: 1; transform: scale(1); }
+.alt-stage.drawing .alt-drawing span { display: inline-block; animation: penDraw .9s ease-in-out infinite; }
+@keyframes penDraw { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-10px, 4px) rotate(-8deg); } 50% { transform: translate(-2px, 8px) rotate(4deg); } 75% { transform: translate(-12px, 10px) rotate(-6deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+.alt-stage.drawing::after { content: '✏️ Drawing…'; position: absolute; left: 50%; top: 8px; transform: translateX(-50%); background: rgba(18, 58, 107, .85); color: #fff; font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 99px; white-space: nowrap; }
+
+/* sketches: a whiteboard look */
+.viz-sketch svg { background: #fff; border-radius: 12px; border: 2px solid var(--line); }
+.viz .sk-text { font-weight: 800; dominant-baseline: middle; }
+
+/* AI illustration being made */
+.illu-wait { display: grid; justify-items: center; gap: .3em; padding: 1.2em .8em; border: 3px dashed #E8833A; border-radius: 14px; background: #FFF8F0; text-align: center; }
+.illu-wait small { color: var(--muted); font-size: .7em; max-width: 40em; }
+.illu-wait span { font-weight: 800; color: #C2410C; }
+.illu-wait.err { border-color: var(--danger); background: #FFF1F0; }
+.illu-brush { font-size: 2em; animation: penDraw 1.2s ease-in-out infinite; }
+.illu-save { margin-top: .5em; }

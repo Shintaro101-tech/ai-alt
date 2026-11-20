@@ -66,6 +66,7 @@ export function visualSummary(v) {
     case 'bar_chart': case 'line_chart': return `${v.kind.replace('_', ' ')}: ${v.labels.join(', ')}`;
     case 'table': return `table: ${v.columns.join(' | ')}`;
     case 'venn': return `Venn diagram: ${v.left.title} / ${v.right.title}`;
+    case 'sketch': return `a sketch${v.caption ? `: ${v.caption}` : ''}`;
     default: return `${v.kind.replace('_', ' ')}: ${(v.items || []).map((x) => x.text).join(', ')}`;
   }
 }
@@ -73,7 +74,7 @@ export function visualSummary(v) {
 export function visualHTML(v) {
   const body = {
     reality: realityHTML, timeline: timelineSVG, bar_chart: barSVG, line_chart: lineSVG,
-    table: tableHTML, venn: vennSVG, steps: stepsHTML, emoji_cards: cardsHTML,
+    table: tableHTML, venn: vennSVG, steps: stepsHTML, emoji_cards: cardsHTML, sketch: sketchSVG,
   }[v.kind]?.(v) || '';
   return `<div class="viz viz-${v.kind}">${body}</div>${v.caption ? `<p class="viz-cap">${esc(v.caption)}</p>` : ''}`;
 }
@@ -239,4 +240,120 @@ function stepsHTML(v) {
 
 function cardsHTML(v) {
   return `<div class="viz-cards">${v.items.map((x) => `<div class="ecard"><div class="em">${esc(x.emoji || '🔹')}</div><b>${esc(x.text)}</b>${x.note ? `<small>${esc(x.note)}</small>` : ''}</div>`).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------- sketches (the ALT draws simple line pictures)
+//
+// The ALT sends shapes on a 400 x 300 canvas. Only plain shapes are accepted (no code, no links),
+// and everything is checked before it is drawn.
+
+const SKETCH_COLORS = { black: '#1F2A37', navy: '#123A6B', blue: '#1E5AA0', red: '#C0392B', orange: '#E8833A', yellow: '#F2B705', green: '#1F9D61', brown: '#8B5A2B', pink: '#E86A92', purple: '#8E44AD', gray: '#7A8699', white: '#FFFFFF', skyblue: '#7EC8F2' };
+const color = (c, dflt) => {
+  const s = str(c).trim().toLowerCase();
+  if (SKETCH_COLORS[s]) return SKETCH_COLORS[s];
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(s)) return s;
+  return dflt;
+};
+const cn = (x, lo = -50, hi = 450) => Math.max(lo, Math.min(hi, Math.round(num(x) * 10) / 10));
+
+export function normalizeSketch(args = {}) {
+  const shapes = [];
+  for (const raw of arr(args.shapes).slice(0, 80)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const s = {
+      type: str(raw.type).toLowerCase(),
+      stroke: color(raw.color ?? raw.stroke, SKETCH_COLORS.black),
+      fill: raw.fill ? color(raw.fill, 'none') : 'none',
+      w: Math.max(1, Math.min(14, num(raw.width ?? raw.stroke_width) || 4)),
+    };
+    if (s.type === 'path') {
+      const d = str(raw.d).trim();
+      if (!d || d.length > 3000 || !/^[MmLlHhVvCcSsQqTtAaZz0-9.,\s\-eE]+$/.test(d)) continue;
+      s.d = d;
+    } else if (s.type === 'line') {
+      Object.assign(s, { x1: cn(raw.x1), y1: cn(raw.y1), x2: cn(raw.x2), y2: cn(raw.y2) });
+    } else if (s.type === 'circle') {
+      Object.assign(s, { cx: cn(raw.cx), cy: cn(raw.cy), r: cn(raw.r, 1, 300) });
+    } else if (s.type === 'ellipse') {
+      Object.assign(s, { cx: cn(raw.cx), cy: cn(raw.cy), rx: cn(raw.rx, 1, 300), ry: cn(raw.ry, 1, 300) });
+    } else if (s.type === 'rect') {
+      Object.assign(s, { x: cn(raw.x), y: cn(raw.y), wd: cn(raw.w ?? raw.width_px ?? raw.rect_width, 1, 450), ht: cn(raw.h ?? raw.height, 1, 350), rx: cn(raw.rx ?? 0, 0, 100) });
+    } else if (s.type === 'polyline' || s.type === 'polygon') {
+      const pts = arr(raw.points).map((p) => (Array.isArray(p) ? p : [p?.x, p?.y])).map(([x, y]) => `${cn(x)},${cn(y)}`).slice(0, 120);
+      if (pts.length < 2) continue;
+      s.points = pts.join(' ');
+    } else if (s.type === 'text') {
+      s.text = str(raw.text).slice(0, 40);
+      if (!s.text) continue;
+      Object.assign(s, { x: cn(raw.x), y: cn(raw.y), size: Math.max(10, Math.min(48, num(raw.size) || 22)) });
+      s.fill = color(raw.color ?? raw.fill, SKETCH_COLORS.black);
+    } else continue;
+    shapes.push(s);
+  }
+  if (!shapes.length) return null;
+  return { kind: 'sketch', caption: str(args.caption), shapes };
+}
+
+function sketchSVG(v) {
+  const common = (s) => `stroke="${s.stroke}" stroke-width="${s.w}" fill="${s.fill}" stroke-linecap="round" stroke-linejoin="round"`;
+  const el = v.shapes.map((s) => {
+    switch (s.type) {
+      case 'path': return `<path d="${s.d}" ${common(s)}/>`;
+      case 'line': return `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" ${common(s)}/>`;
+      case 'circle': return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" ${common(s)}/>`;
+      case 'ellipse': return `<ellipse cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}" ${common(s)}/>`;
+      case 'rect': return `<rect x="${s.x}" y="${s.y}" width="${s.wd}" height="${s.ht}" rx="${s.rx}" ${common(s)}/>`;
+      case 'polyline': return `<polyline points="${s.points}" ${common(s)}/>`;
+      case 'polygon': return `<polygon points="${s.points}" ${common(s)}/>`;
+      case 'text': return `<text x="${s.x}" y="${s.y}" font-size="${s.size}" fill="${s.fill}" class="sk-text">${esc(s.text)}</text>`;
+      default: return '';
+    }
+  }).join('');
+  return `<svg viewBox="0 0 400 300" role="img" aria-label="sketch">${el}</svg>`;
+}
+
+// ---------------------------------------------------------------- AI illustrations (made on request, ~30 s)
+
+export function illustrationHTML(c) {
+  if (c.status === 'pending') {
+    return `<div class="illu-wait"><div class="illu-brush">🎨</div><b>イラストを描いています…</b><span data-since="${c.started}">0 秒</span><small>${esc(c.prompt)}</small></div>`;
+  }
+  if (c.status === 'error') return `<div class="illu-wait err"><b>イラストを作れませんでした</b><small>${esc(c.error || '')}</small></div>`;
+  return `<figure class="viz-pic"><img src="${esc(c.src)}" alt="${esc(c.prompt)}">${c.caption ? `<figcaption>${esc(c.caption)}</figcaption>` : ''}</figure>`;
+}
+
+// ---------------------------------------------------------------- drawing animation
+//
+// Lines are drawn stroke by stroke and the rest fades in, as if the ALT were drawing on the board.
+// Returns how long the drawing takes (ms), so the avatar can "draw" for that long.
+export function animateDrawing(root) {
+  if (!root || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+  const svg = root.querySelector('.viz svg');
+  let t = 0;
+  if (svg) {
+    const shapes = [...svg.querySelectorAll('path, line, polyline, polygon, rect, circle, ellipse')];
+    const per = Math.max(60, Math.min(260, 2400 / Math.max(1, shapes.length)));
+    for (const s of shapes) {
+      const dashed = s.getAttribute('stroke-dasharray');
+      let len = 0;
+      try { len = s.getTotalLength(); } catch { len = 0; }
+      const filled = (s.getAttribute('fill') || 'none') !== 'none';
+      if (!dashed && len > 0) {
+        s.animate([{ strokeDasharray: `${len}`, strokeDashoffset: `${len}` }, { strokeDasharray: `${len}`, strokeDashoffset: '0' }],
+          { duration: per * 1.6, delay: t, easing: 'ease-in-out', fill: 'backwards' });
+        if (filled) s.animate([{ fillOpacity: 0 }, { fillOpacity: s.getAttribute('fill-opacity') || 1 }], { duration: 300, delay: t + per * 1.4, fill: 'backwards' });
+      } else {
+        s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: t, fill: 'backwards' });
+      }
+      t += per;
+    }
+    for (const x of svg.querySelectorAll('text')) x.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, delay: t * 0.6, fill: 'backwards' });
+    return t + per * 1.6;
+  }
+  const parts = root.querySelectorAll('.viz > * > *, .viz > table tr, .viz-pic');
+  parts.forEach((p, i) => {
+    p.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 380, delay: i * 140, easing: 'ease-out', fill: 'backwards' });
+    t = i * 140 + 380;
+  });
+  return t;
 }
