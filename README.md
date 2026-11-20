@@ -117,6 +117,7 @@ python3 -m http.server 8765 --directory AI-ALT
 → http://localhost:8765 を Chrome で開く（マイクの許可が必要）。合言葉は洋書トークと同じです。
 
 **ウェブ公開する**：このフォルダを GitHub Pages（shintaro101-tech.github.io のリポジトリ）に置けば、どのPCからでも開けます。
+公開する前に `python3 tools/update-version.py` を実行してください。各ファイルの住所に中身ごとの番号が付き、ブラウザが古いファイルを使い続けることがなくなります。
 
 ## 構成
 
