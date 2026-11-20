@@ -393,7 +393,7 @@ dialog h2 { margin: 0 0 8px; }
 @media (max-width: 860px) { .display-nav .snd-stop { position: static; transform: none; } }
 
 /* microphone & speaker check */
-.dev-btn.wide { flex-basis: 100%; max-width: 260px; }
+.dev-btn.wide { flex-basis: 100%; max-width: 260px; white-space: normal; }
 .devcheck { width: 100%; }
 dialog:has(.devcheck) { width: min(520px, 94vw); }
 .dev-block { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; display: grid; gap: 6px; }

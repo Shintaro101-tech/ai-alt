@@ -173,7 +173,7 @@ export async function renderClass(el, id) {
         <button class="btn btn-ghost" id="stop">⏹ 終了</button>`;
       $('#mic', el).onclick = toggleMic;
       $('#stop', el).onclick = () => stop();
-      c.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm dev-btn" id="devices" title="マイク・スピーカーの切り替え">🎧</button>');
+      c.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm dev-btn wide" id="devices" title="授業中でも ALT との接続を切らずに切り替えられます">🎧 マイク・スピーカー</button>');
     } else if (state.status === 'connecting') {
       c.innerHTML = '<button class="btn btn-primary" disabled>接続中…</button>';
     } else {
