@@ -478,3 +478,11 @@ dialog:has(.devcheck) { width: min(520px, 94vw); }
 .illu-wait.err { border-color: var(--danger); background: #FFF1F0; }
 .illu-brush { font-size: 2em; animation: penDraw 1.2s ease-in-out infinite; }
 .illu-save { margin-top: .5em; }
+
+/* on-screen volume (the app's own sound, within the computer's volume) */
+.alt-volume { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 260px; margin: 8px auto 0; }
+.vol-mute { border: 0; background: none; font-size: 1.25rem; cursor: pointer; padding: 2px 4px; border-radius: 8px; line-height: 1; }
+.vol-mute:hover { background: #EEF2F8; }
+.alt-volume input[type=range] { flex: 1; min-width: 0; accent-color: var(--navy-2); cursor: pointer; }
+.vol-num { min-width: 3.2em; text-align: right; font-size: .85rem; color: var(--muted, #5B6B80); font-variant-numeric: tabular-nums; }
+@media (max-width: 860px) { .alt-volume { margin-left: 0; } }

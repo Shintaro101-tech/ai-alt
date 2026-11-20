@@ -52,8 +52,7 @@ export class SoundPlayer {
     }
     if (snd.cmd === 'stop') { this.stop(snd.id); return; }
     if (cur) this.stop(snd.id);
-    const audio = useSpeaker(new Audio(snd.src));
-    audio.volume = Math.max(0, Math.min(1, snd.vol ?? 1));
+    const audio = useSpeaker(new Audio(snd.src), snd.vol ?? 1);
     audio.loop = Boolean(snd.loop);
     audio.currentTime = snd.from || 0;
     const t = { audio, first: slideIndex, last: slideIndex + Math.max(1, snd.slides || 1) - 1, name: snd.name || '' };

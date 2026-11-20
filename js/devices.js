@@ -29,16 +29,39 @@ export async function openMic(id = micId()) {
   return navigator.mediaDevices.getUserMedia({ audio: BASE });
 }
 
-// Sends an <audio>/Audio element to the chosen speaker (where the browser allows it).
+// The on-screen volume (0–100) for everything the app plays: the ALT's voice and slide sounds.
+// A browser cannot change the computer's or a Bluetooth speaker's own volume, so this scales the
+// app's sound within it: the loudest setting here is the computer's current volume.
+const KEY_VOL = 'aialt:volume';
+const KEY_MUTE = 'aialt:muted';
+export const volume = () => { const v = Number(read(KEY_VOL) || 100); return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 100; };
+export const volumeMuted = () => read(KEY_MUTE) === '1';
+const gain = () => (volumeMuted() ? 0 : volume() / 100);
+
+// Sends an <audio>/Audio element to the chosen speaker (where the browser allows it) and at the
+// on-screen volume. `base` is the element's own volume (e.g. a slide sound set to 60%).
 const outputs = new Set();
-export function useSpeaker(audioEl) {
+const bases = new WeakMap();
+export function useSpeaker(audioEl, base = 1) {
   if (!audioEl) return audioEl;
   outputs.add(audioEl);
+  bases.set(audioEl, Math.max(0, Math.min(1, base)));
+  audioEl.volume = bases.get(audioEl) * gain();
   const id = speakerId();
   if (canPickSpeaker && id) audioEl.setSinkId(id).catch(() => {});
   return audioEl;
 }
 export function forgetSpeaker(audioEl) { outputs.delete(audioEl); }
+function applyVolumeToAll() {
+  const g = gain();
+  for (const a of outputs) a.volume = (bases.get(a) ?? 1) * g;
+}
+export function setVolume(v) {
+  write(KEY_VOL, String(Math.round(Math.max(0, Math.min(100, v)))));
+  if (volumeMuted() && v > 0) write(KEY_MUTE, '');
+  applyVolumeToAll();
+}
+export function setVolumeMuted(m) { write(KEY_MUTE, m ? '1' : ''); applyVolumeToAll(); }
 function applySpeakerToAll() {
   const id = speakerId();
   if (!canPickSpeaker) return;
@@ -127,6 +150,7 @@ export function openDeviceCheck({ onChange } = {}) {
 
     function play(url) {
       const a = new Audio(url);
+      a.volume = gain();
       const id = speakerId();
       players.add(a);
       a.onended = () => players.delete(a);

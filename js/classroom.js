@@ -9,7 +9,7 @@ import { getLesson, saveLesson } from './store.js';
 import { LEVELS, levelKey, PACES, PACE_KEYS, paceKey, paceText } from './levels.js';
 import { levelButtons } from './editor.js';
 import { SoundPlayer } from './sound.js';
-import { openDeviceCheck } from './devices.js';
+import { openDeviceCheck, volume, volumeMuted, setVolume, setVolumeMuted } from './devices.js';
 import { VISUAL_KINDS, normalizeVisual, normalizeSketch, visualHTML, visualSummary, pictureHTML, findPicture, illustrationHTML, animateDrawing } from './visuals.js';
 import { ensurePasscode, relayPost } from './api.js';
 import { LiveSession } from './live.js';
@@ -70,6 +70,7 @@ export async function renderClass(el, id) {
         <div class="alt-stage" id="altBox"></div>
         <div class="alt-name" id="altName"></div>
         <div class="alt-controls" id="controls"></div>
+        <div class="alt-volume" id="vol"></div>
         <div class="alt-pick" id="pick"></div>
         <div class="class-level">
           <div class="class-level-title">学生の英語レベル <small id="lvDesc"></small></div>
@@ -747,11 +748,41 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     next();
   });
 
+  // ------------------------------------------------------------------ volume
+  // The app's own volume (ALT's voice + slide sounds). The loudest setting is the computer's volume.
+  function drawVolume() {
+    const box = $('#vol', el);
+    const muted = volumeMuted();
+    const v = volume();
+    const icon = muted || v === 0 ? '🔇' : v < 40 ? '🔈' : v < 75 ? '🔉' : '🔊';
+    box.innerHTML = `
+      <button class="vol-mute" id="volMute" title="${muted ? '音を出す' : '消音'}（0 キー）">${icon}</button>
+      <input type="range" id="volRange" min="0" max="100" step="5" value="${muted ? 0 : v}" aria-label="音量" title="音量（− / + キー）">
+      <span class="vol-num" id="volNum">${muted ? '消音' : v + '%'}</span>`;
+    $('#volMute', el).onclick = () => { setVolumeMuted(!volumeMuted()); drawVolume(); };
+    const range = $('#volRange', el);
+    range.oninput = () => {
+      setVolume(Number(range.value));
+      $('#volNum', el).textContent = `${range.value}%`;
+      $('#volMute', el).textContent = range.value === '0' ? '🔇' : range.value < 40 ? '🔈' : range.value < 75 ? '🔉' : '🔊';
+    };
+    range.onchange = drawVolume;
+  }
+  function nudgeVolume(d) {
+    const v = Math.max(0, Math.min(100, (volumeMuted() ? 0 : volume()) + d));
+    if (v === 0) setVolumeMuted(true); else setVolume(v);
+    drawVolume();
+    toast(v === 0 ? '🔇 消音' : `音量 ${v}%`);
+  }
+
   // ------------------------------------------------------------------ keys (PowerPoint-compatible)
   const onKey = (e) => {
     if (e.target.closest('input, textarea, select, dialog') || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
+    if (k === '0' && !state.jump) { setVolumeMuted(!volumeMuted()); drawVolume(); toast(volumeMuted() ? '🔇 消音' : `音量 ${volume()}%`); return; }
     if (/^[0-9]$/.test(k)) { state.jump += k; return; }
+    if (['+', '=', ';'].includes(k)) { e.preventDefault(); nudgeVolume(10); return; }
+    if (k === '-') { e.preventDefault(); nudgeVolume(-10); return; }
     if (k === 'Enter' && state.jump) {
       e.preventDefault();
       goSlide(Number(state.jump) - 1);
@@ -784,6 +815,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     }
   };
   document.addEventListener('keydown', onKey);
+  drawVolume();
   const onLeave = (e) => { if (live) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', onLeave);
 
