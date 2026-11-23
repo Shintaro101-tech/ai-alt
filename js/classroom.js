@@ -755,21 +755,27 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
   // ------------------------------------------------------------------ voice quality
   // Shown while the ALT's voice is arriving badly (dropped or delayed audio over the network),
   // so the teacher can tell a network problem from a problem with the voice itself.
+  // Small wobbles are normal on Wi-Fi and the browser smooths them out, so the badge appears
+  // only when the voice is clearly breaking up for a few seconds in a row (4 s), and goes away
+  // after 6 s without problems.
   let goodRun = 0;
+  let badRun = 0;
   function showQuality(q) {
     const box = $('#netWarn', el);
     if (!box) return;
-    if (q.level === 'good') {
+    if (q.level !== 'bad') {
+      badRun = 0;
       if (++goodRun >= 3) box.classList.add('hide');
       return;
     }
     goodRun = 0;
-    box.classList.toggle('bad', q.level === 'bad');
-    box.textContent = q.level === 'bad' ? '📶 通信が不安定です' : '📶 通信がやや不安定';
+    if (++badRun < 2) return;
+    box.classList.add('bad');
+    box.textContent = '📶 通信が不安定です';
     box.title = `音の欠け ${(Math.max(q.lost, q.concealed) * 100).toFixed(1)}%・声の伸び縮み ${(q.stretched * 100).toFixed(1)}%・揺らぎ ${q.jitterMs}ms`;
     box.classList.remove('hide');
   }
-  function hideQuality() { goodRun = 0; $('#netWarn', el)?.classList.add('hide'); }
+  function hideQuality() { goodRun = 0; badRun = 0; $('#netWarn', el)?.classList.add('hide'); }
 
   // ------------------------------------------------------------------ volume
   // The app's own volume (ALT's voice + slide sounds). The loudest setting is the computer's volume.
