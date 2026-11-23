@@ -69,6 +69,7 @@ export async function renderClass(el, id) {
       <section class="alt-panel">
         <div class="alt-stage" id="altBox"></div>
         <div class="alt-name" id="altName"></div>
+        <div class="net-warn hide" id="netWarn" role="status"></div>
         <div class="alt-controls" id="controls"></div>
         <div class="alt-volume" id="vol"></div>
         <div class="alt-pick" id="pick"></div>
@@ -575,6 +576,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
         if (st === 'lost') { toast('接続が切れました。もう一度呼んでください。', 'error'); stop(); }
       },
       onRemoteStream: (stream) => meter.attach(stream, $('#altBox', el)),
+      onQuality: showQuality,
       onEvent: (ev) => {
         if (ev.type === 'session.input_transcript.delta') addTranscript('class', ev.delta);
         else if (ev.type === 'session.output_transcript.delta') addTranscript('alt', ev.delta);
@@ -601,6 +603,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
       toast(err.name === 'NotAllowedError' ? 'マイクの使用が許可されていません。ブラウザの設定を確認してください。' : err.message, 'error');
       meter?.stop();
       meter = null;
+      hideQuality();
       live = null;
       state.status = resume ? 'ended' : 'idle';
       drawAlt();
@@ -625,6 +628,7 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     clearInterval(clock);
     meter?.stop();
     meter = null;
+    hideQuality();
     state.status = 'ended';
     drawAlt();
     drawControls();
@@ -747,6 +751,25 @@ ${transcript}${shown ? `\nAlready on your board:\n${shown}` : ''}`;
     if (swiped || state.tab !== 'slides' || e.target.closest('button, a, input')) return;
     next();
   });
+
+  // ------------------------------------------------------------------ voice quality
+  // Shown while the ALT's voice is arriving badly (dropped or delayed audio over the network),
+  // so the teacher can tell a network problem from a problem with the voice itself.
+  let goodRun = 0;
+  function showQuality(q) {
+    const box = $('#netWarn', el);
+    if (!box) return;
+    if (q.level === 'good') {
+      if (++goodRun >= 3) box.classList.add('hide');
+      return;
+    }
+    goodRun = 0;
+    box.classList.toggle('bad', q.level === 'bad');
+    box.textContent = q.level === 'bad' ? '📶 通信が不安定です' : '📶 通信がやや不安定';
+    box.title = `音の欠け ${(Math.max(q.lost, q.concealed) * 100).toFixed(1)}%・声の伸び縮み ${(q.stretched * 100).toFixed(1)}%・揺らぎ ${q.jitterMs}ms`;
+    box.classList.remove('hide');
+  }
+  function hideQuality() { goodRun = 0; $('#netWarn', el)?.classList.add('hide'); }
 
   // ------------------------------------------------------------------ volume
   // The app's own volume (ALT's voice + slide sounds). The loudest setting is the computer's volume.

@@ -10,8 +10,8 @@ import { relayPost } from './api.js';
 import { openMic, useSpeaker, forgetSpeaker } from './devices.js';
 
 export class LiveSession {
-  constructor({ session, onEvent, onStatus, onRemoteStream, onFunctionCall }) {
-    Object.assign(this, { session, onEvent, onStatus, onRemoteStream, onFunctionCall });
+  constructor({ session, onEvent, onStatus, onRemoteStream, onFunctionCall, onQuality }) {
+    Object.assign(this, { session, onEvent, onStatus, onRemoteStream, onFunctionCall, onQuality });
     this.delegations = new Map(); // delegation_id -> { running, sent, completed }
     this.closed = false;
   }
@@ -65,6 +65,49 @@ export class LiveSession {
     this.id = j.session?.id ?? j.id;
     const answer = j.transport?.sdp ?? j.sdp;
     await this.pc.setRemoteDescription({ type: 'answer', sdp: answer });
+    this.watchQuality();
+  }
+
+  // How well the ALT's voice is arriving, every 2 seconds. When the network drops or delays
+  // audio, the browser fills the gaps (concealment) or stretches/squeezes the voice to catch up
+  // (time-stretching); both make the voice sound robotic or like a voice changer.
+  // Reports { level: 'good' | 'poor' | 'bad', lost, stretched, jitterMs } through onQuality.
+  watchQuality() {
+    let prev = null;
+    this.quality = { worst: 'good', poorSeconds: 0 };
+    this.qualityTimer = setInterval(async () => {
+      if (this.closed || !this.pc) return;
+      let a = null;
+      try {
+        (await this.pc.getStats()).forEach((r) => { if (r.type === 'inbound-rtp' && r.kind === 'audio') a = r; });
+      } catch { return; }
+      if (!a) return;
+      const cur = {
+        recv: a.totalSamplesReceived || 0,
+        concealed: (a.concealedSamples || 0) - (a.silentConcealedSamples || 0),
+        stretched: (a.insertedSamplesForDeceleration || 0) + (a.removedSamplesForAcceleration || 0),
+        lost: a.packetsLost || 0,
+        got: a.packetsReceived || 0,
+      };
+      if (prev) {
+        const recv = cur.recv - prev.recv;
+        const packets = (cur.got - prev.got) + (cur.lost - prev.lost);
+        const lost = packets > 0 ? (cur.lost - prev.lost) / packets : 0;
+        const concealed = recv > 0 ? (cur.concealed - prev.concealed) / recv : 0;
+        const stretched = recv > 0 ? (cur.stretched - prev.stretched) / recv : 0;
+        const jitterMs = Math.round((a.jitter || 0) * 1000);
+        const bad = Math.max(lost, concealed) > 0.08 || stretched > 0.15;
+        const poor = bad || Math.max(lost, concealed) > 0.02 || stretched > 0.05 || jitterMs > 60;
+        const level = bad ? 'bad' : poor ? 'poor' : 'good';
+        if (level !== 'good') {
+          this.quality.poorSeconds += 2;
+          if (level === 'bad' || this.quality.worst === 'good') this.quality.worst = level;
+          console.info('[AI-ALT] voice quality', level, { lost: lost.toFixed(3), concealed: concealed.toFixed(3), stretched: stretched.toFixed(3), jitterMs });
+        }
+        this.onQuality?.({ level, lost, concealed, stretched, jitterMs });
+      }
+      prev = cur;
+    }, 2000);
   }
 
   send(ev) {
@@ -159,6 +202,7 @@ export class LiveSession {
   }
 
   cleanup() {
+    clearInterval(this.qualityTimer);
     this.mic?.getTracks().forEach((t) => t.stop());
     try { this.dc?.close(); } catch {}
     try { this.pc?.close(); } catch {}

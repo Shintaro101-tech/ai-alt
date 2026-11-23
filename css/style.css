@@ -486,3 +486,8 @@ dialog:has(.devcheck) { width: min(520px, 94vw); }
 .alt-volume input[type=range] { flex: 1; min-width: 0; accent-color: var(--navy-2); cursor: pointer; }
 .vol-num { min-width: 3.2em; text-align: right; font-size: .85rem; color: var(--muted, #5B6B80); font-variant-numeric: tabular-nums; }
 @media (max-width: 860px) { .alt-volume { margin-left: 0; } }
+
+/* voice quality warning (network) */
+.net-warn { white-space: nowrap; margin: 4px auto 0; padding: 3px 10px; border-radius: 99px; font-size: .8rem; font-weight: 700; background: #FFF4D6; color: #8A5A00; width: fit-content; cursor: help; }
+.net-warn.bad { background: #FFE1DE; color: #B42318; }
+.net-warn.hide { display: none; }
